@@ -1,0 +1,1957 @@
+<!DOCTYPE html>
+<html lang="ko" class="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>SignPass - 카카오톡 연동 간판 인허가 & 도면 자동생성 플랫폼</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#0066ff',
+              600: '#0052cc',
+              700: '#003d99',
+              800: '#1e40af',
+              900: '#00205b',
+            },
+            kakao: {
+              bg: '#b2c7da',
+              yellow: '#fee500',
+              label: '#3c1e1e',
+              bubble: '#ffffff',
+              badge: '#f59e0b',
+            },
+            cad: {
+              bg: '#051325',
+              grid: '#0a233d',
+              accent: '#00e5ff',
+            }
+          },
+          fontFamily: {
+            sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      background-color: #0b1329;
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+      margin: 0;
+      padding: 0;
+    }
+    
+    /* CAD Blueprint Grid Pattern */
+    .cad-blueprint-grid {
+      background-color: #051325;
+      background-image: 
+        linear-gradient(rgba(0, 150, 255, 0.12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 150, 255, 0.12) 1px, transparent 1px),
+        linear-gradient(rgba(0, 150, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 150, 255, 0.04) 1px, transparent 1px);
+      background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
+      background-position: -1px -1px, -1px -1px, -1px -1px, -1px -1px;
+    }
+    
+    /* Signage glow effects */
+    .signage-glow-on {
+      text-shadow: 0 0 14px rgba(255, 255, 255, 0.9), 0 0 28px rgba(255, 220, 100, 0.8), 0 0 45px rgba(255, 200, 50, 0.5);
+      transition: all 0.3s ease;
+    }
+    .signage-glow-off {
+      text-shadow: none;
+      color: #64748b !important;
+      transition: all 0.3s ease;
+    }
+    .led-bulb-on {
+      background-color: #f59e0b;
+      box-shadow: 0 0 16px #f59e0b, 0 0 30px #f59e0b;
+      transition: all 0.3s ease;
+    }
+    .led-bulb-off {
+      background-color: #475569;
+      box-shadow: none;
+      transition: all 0.3s ease;
+    }
+
+    /* Coffee Sign Glow */
+    .coffee-sign-on {
+      color: #f59e0b;
+      filter: drop-shadow(0 0 3px #f59e0b) drop-shadow(0 0 8px #fbbf24);
+      transform: scale(1.05);
+      transition: all 0.3s ease;
+    }
+    .coffee-sign-off {
+      color: #64748b;
+      filter: none;
+      opacity: 0.6;
+      transform: scale(0.95);
+      transition: all 0.3s ease;
+    }
+
+    .pb-safe {
+      padding-bottom: calc(env(safe-area-inset-bottom, 16px) + 90px);
+    }
+
+    /* Hide scrollbars */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    * {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Pulse animation for linked action */
+    @keyframes highlightPulse {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(254, 229, 0, 0.7); }
+      50% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(254, 229, 0, 0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(254, 229, 0, 0); }
+    }
+    .pulse-attention {
+      animation: highlightPulse 1.6s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-800 antialiased bg-slate-950 flex flex-col items-center">
+
+  <!-- ========================================================================= -->
+  <!-- TOP GLOBAL CONTROLLER BAR (카톡 채팅창 ↔ SignPass 앱 전환 & 듀얼뷰 지원) -->
+  <!-- ========================================================================= -->
+  <header class="w-full bg-slate-900/90 backdrop-blur-md border-b border-slate-800 text-white px-4 py-2 sticky top-0 z-50 flex items-center justify-between text-xs">
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 flex items-center justify-center">
+        <img src="./assets/logo.png" alt="SignPass" class="w-full h-full object-contain filter drop-shadow-[0_1px_4px_rgba(0,180,255,0.4)]" />
+      </div>
+      <div class="flex items-center leading-none">
+        <span class="font-extrabold text-sm text-white">Sign</span>
+        <span class="italic font-black text-[13px] bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent ml-0.5 pr-2">PASS</span>
+        <span class="text-xs text-slate-400 ml-1.5 hidden sm:inline font-normal">카카오톡 연동 플랫폼</span>
+      </div>
+    </div>
+
+    <!-- View Mode Switcher Buttons -->
+    <div class="flex items-center bg-slate-800/90 p-1 rounded-xl border border-slate-700">
+      <button id="btn-view-kakao" onclick="switchMainView('kakao')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-[#fee500] text-slate-950 shadow-sm">
+        <span>💬</span>
+        <span>카카오톡 채팅창</span>
+        <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+      </button>
+
+      <button id="btn-view-app" onclick="switchMainView('app')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition-all flex items-center gap-1.5">
+        <span>⚡</span>
+        <span>SignPass 앱</span>
+      </button>
+
+      <button id="btn-view-dual" onclick="toggleDualView()" class="hidden md:flex px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-sky-300 transition-all items-center gap-1.5 border-l border-slate-700 ml-1">
+        <i data-lucide="columns-2" class="w-3.5 h-3.5"></i>
+        <span>듀얼 연동뷰</span>
+      </button>
+    </div>
+
+    <!-- Dark Mode & Reset -->
+    <div class="flex items-center gap-2">
+      <button onclick="toggleDarkMode()" aria-label="Toggle Theme" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors">
+        <span id="theme-icon">🌙</span>
+      </button>
+      <button onclick="resetDemoData()" title="데모 데이터 초기화" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors hidden sm:block">
+        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- MAIN WORKSPACE CONTAINER (단일 뷰 또는 듀얼 연동 뷰) -->
+  <!-- ========================================================================= -->
+  <div id="workspace-container" class="w-full flex-1 flex justify-center items-start py-3 px-2 sm:px-4 gap-6 transition-all">
+
+    <!-- ======================================================================= -->
+    <!-- [VIEW 1] KAKAO TALK CHATROOM SIMULATOR (고객 '윤수병' 채팅창 & 알림톡 카드) -->
+    <!-- ======================================================================= -->
+    <section id="pane-kakao" class="w-full max-w-[430px] rounded-[36px] overflow-hidden shadow-2xl border-[6px] border-slate-800 bg-[#b2c7da] flex flex-col h-[850px] max-h-[calc(100vh-65px)] relative transition-all duration-300">
+      
+      <!-- iPhone Top Dynamic Island / Speaker Bar -->
+      <div class="w-full bg-[#b2c7da] pt-2 px-6 flex justify-between items-center text-[12px] text-slate-800 font-semibold select-none">
+        <span>9:41</span>
+        <div class="w-20 h-4 bg-slate-900 rounded-full"></div>
+        <div class="flex items-center gap-1.5 text-xs">
+          <span>5G</span>
+          <i data-lucide="battery-full" class="w-4 h-4"></i>
+        </div>
+      </div>
+
+      <!-- Kakao Chat Room Top Header (윤수병 채팅방) -->
+      <header class="bg-[#b2c7da] px-4 py-2 flex items-center justify-between border-b border-black/5 select-none">
+        <div class="flex items-center gap-3">
+          <button onclick="switchMainView('app')" class="p-1 rounded-full hover:bg-black/5 active:scale-90 transition-all" title="SignPass 앱으로 돌아가기">
+            <i data-lucide="arrow-left" class="w-5 h-5 text-slate-800"></i>
+          </button>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-bold text-slate-900 tracking-tight">윤수병</h1>
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 text-slate-700">
+          <button class="p-1 rounded-full hover:bg-black/5" onclick="showToast('채팅방 메시지 검색')" title="검색">
+            <i data-lucide="search" class="w-5 h-5"></i>
+          </button>
+          <button class="p-1 rounded-full hover:bg-black/5" onclick="openChatDrawer()" title="메뉴">
+            <i data-lucide="menu" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Kakao Chat Content Area -->
+      <div id="kakao-chat-scroll" class="flex-1 p-3 overflow-y-auto space-y-3 select-text pb-20">
+        
+        <!-- Date Divider -->
+        <div class="flex justify-center my-2 select-none">
+          <span class="bg-black/15 text-white/90 text-[10px] font-medium px-3 py-1 rounded-full backdrop-blur-xs">
+            2026년 9월 15일 화요일
+          </span>
+        </div>
+
+        <!-- System Notice Bubble -->
+        <div class="flex justify-center select-none">
+          <div class="bg-black/10 text-slate-700 text-[11px] px-3 py-1 rounded-lg max-w-[85%] text-center">
+            SignPass 비즈니스 알림톡 연동 서비스가 시작되었습니다.
+          </div>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- SIGN PASS ALIMTALK CARD (사용자 첨부 캡처 이미지 100% 동일 구현) -->
+        <!-- =================================================================== -->
+        <div class="flex items-start gap-2 max-w-[340px] animate-in fade-in duration-300" id="kakao-card-wrapper">
+          <!-- Profile Avatar -->
+          <div class="w-10 h-10 rounded-[14px] bg-gradient-to-br from-blue-900 to-slate-950 p-1 flex-shrink-0 shadow-sm border border-blue-500/30 flex items-center justify-center">
+            <img src="./assets/logo.png" alt="SIGN PASS" class="w-full h-full object-contain filter drop-shadow-[0_2px_6px_rgba(0,180,255,0.4)]" />
+          </div>
+
+          <div class="flex-1 space-y-1">
+            <!-- Channel Name & Verified Badge -->
+            <div class="flex items-center gap-1">
+              <span class="text-xs font-bold text-slate-900">SIGN PASS</span>
+              <span class="w-3.5 h-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-black">✓</span>
+            </div>
+
+            <!-- White Card Bubble -->
+            <div class="bg-white rounded-2xl overflow-hidden shadow-md border border-slate-200/80">
+              
+              <!-- Yellow Top Header: 알림톡 카드 + Bell Icon -->
+              <div class="bg-[#fef9c3]/70 px-3.5 py-2 flex items-center justify-between border-b border-yellow-200/70">
+                <div class="flex items-center gap-1.5">
+                  <!-- Yellow Kakao Speech Bubble Icon -->
+                  <div class="w-5 h-5 rounded-full bg-[#fee500] flex items-center justify-center text-[#3c1e1e] font-black text-[10px] shadow-xs">
+                    💬
+                  </div>
+                  <span class="text-xs font-bold text-slate-800">알림톡 카드</span>
+                </div>
+                <!-- Orange Bell Badge -->
+                <div class="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                  <i data-lucide="bell" class="w-3.5 h-3.5 fill-current"></i>
+                </div>
+              </div>
+
+              <!-- Card Body Content -->
+              <div class="p-3.5 space-y-2.5">
+                <!-- Title -->
+                <div>
+                  <h2 class="text-sm font-black text-slate-900 leading-tight">
+                    [SIGN PASS] 신규 간판<br />상담 접수 카드
+                  </h2>
+                </div>
+
+                <!-- Info Fields List (앱과 실시간 양방향 연동!) -->
+                <div class="space-y-1 text-xs text-slate-800 font-medium">
+                  <div class="flex items-baseline">
+                    <span class="w-12 text-slate-600 font-bold">상호:</span>
+                    <span id="kakao-disp-brand" class="font-extrabold text-slate-950">모두의카페</span>
+                  </div>
+                  <div class="flex items-baseline">
+                    <span class="w-12 text-slate-600 font-bold">업종:</span>
+                    <span id="kakao-disp-cat" class="text-slate-900">카페/음료</span>
+                  </div>
+                  <div class="flex items-baseline">
+                    <span class="w-12 text-slate-600 font-bold">위치:</span>
+                    <span id="kakao-disp-floor" class="text-slate-900">2층 전면</span>
+                  </div>
+                  <div class="flex items-baseline">
+                    <span class="w-12 text-slate-600 font-bold">형태:</span>
+                    <span id="kakao-disp-type" class="font-bold text-blue-700">LED 채널간판</span>
+                  </div>
+                </div>
+
+                <!-- Store Facade Image (사용자 캡처 이미지와 흡사한 감성 카페 파사드) -->
+                <div class="relative w-full h-36 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shadow-inner group cursor-pointer" onclick="openPhotoPreviewModal()">
+                  <img id="kakao-facade-img" src="https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=600&q=80" alt="매장 파사드" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <div class="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded bg-black/60 text-white text-[9px] font-medium backdrop-blur-xs flex items-center gap-1">
+                    <i data-lucide="maximize-2" class="w-2.5 h-2.5"></i> 크게보기
+                  </div>
+                </div>
+
+                <!-- Interactive Action Buttons -->
+                <div class="space-y-1.5 pt-1">
+                  <!-- Button 1: [원클릭 인허가 서류 생성] (Yellow Primary) -->
+                  <button id="btn-action-generate-permit" onclick="triggerKakaoToPermit()" type="button" class="w-full py-3 px-3 rounded-xl bg-[#fee500] hover:bg-[#ebd300] active:scale-[0.98] text-[#191919] font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all pulse-attention border border-amber-300">
+                    <i data-lucide="file-check-2" class="w-4 h-4 text-amber-900"></i>
+                    <span>[원클릭 인허가 서류 생성]</span>
+                  </button>
+
+                  <!-- Button 2: [고객에게 바로 전화하기] (Light Grey) -->
+                  <button onclick="openCallClientModal()" type="button" class="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-200 transition-all">
+                    <i data-lucide="phone-call" class="w-3.5 h-3.5 text-blue-600"></i>
+                    <span>[고객에게 바로 전화하기]</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Card Bottom Meta -->
+              <div class="px-3.5 py-1.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-600 font-medium">
+                <span>SignPass 실시간 연동 보증</span>
+                <span class="text-blue-600 font-bold cursor-pointer hover:underline" onclick="switchMainView('app')">SignPass 앱 바로열기 &gt;</span>
+              </div>
+            </div>
+
+            <div class="text-[9px] text-slate-500 pl-1 select-none font-medium">오전 10:24</div>
+          </div>
+        </div>
+
+        <!-- Chat history dynamic container -->
+        <div id="extra-chat-messages" class="space-y-2.5 pt-2"></div>
+      </div>
+
+      <!-- Kakao Bottom Input Bar (실제 텍스트 입력 및 전송 가능) -->
+      <footer class="bg-white px-3 py-2 border-t border-slate-200 flex items-center gap-2 select-none absolute bottom-0 left-0 right-0 z-10">
+        <button onclick="showToast('사진/파일 전송 메뉴')" class="text-slate-500 hover:text-slate-800 p-1">
+          <i data-lucide="camera" class="w-5 h-5"></i>
+        </button>
+        <button onclick="showToast('음성 메시지 기능')" class="text-slate-500 hover:text-slate-800 p-1">
+          <i data-lucide="mic" class="w-5 h-5"></i>
+        </button>
+
+        <div class="flex-1 bg-slate-100 rounded-full px-3 py-1.5 flex items-center gap-2 border border-slate-200 focus-within:border-blue-500 transition-colors">
+          <input id="kakao-chat-input" onkeypress="if(event.key==='Enter') sendKakaoChatMessage()" type="text" placeholder="메시지를 입력하세요..." class="w-full bg-transparent text-xs text-slate-900 focus:outline-none" />
+          <button onclick="showToast('이모티콘')" class="text-slate-400 hover:text-slate-600">
+            <i data-lucide="smile" class="w-4 h-4"></i>
+          </button>
+          <button onclick="showToast('샵 검색')" class="text-slate-400 hover:text-slate-600 font-bold text-xs">
+            #
+          </button>
+        </div>
+
+        <button onclick="sendKakaoChatMessage()" class="w-8 h-8 rounded-full bg-[#fee500] hover:bg-yellow-400 active:scale-95 text-[#3c1e1e] flex items-center justify-center shadow-xs transition-transform flex-shrink-0">
+          <i data-lucide="send" class="w-4 h-4"></i>
+        </button>
+      </footer>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- [VIEW 2] SIGN PASS COMPLETE APPLICATION (인허가, 도면, 간판접수, 사업자관리) -->
+    <!-- ======================================================================= -->
+    <section id="pane-app" class="w-full max-w-[430px] bg-slate-100 dark:bg-[#0f172a] rounded-[36px] overflow-hidden shadow-2xl border-[6px] border-slate-800 h-[850px] max-h-[calc(100vh-65px)] flex flex-col relative transition-all duration-200">
+      
+      <!-- Top iPhone Island Bar -->
+      <div class="w-full bg-white/90 dark:bg-[#0f172a]/90 pt-2 px-6 flex justify-between items-center text-[12px] text-slate-800 dark:text-slate-200 font-semibold select-none">
+        <span>9:41</span>
+        <div class="w-20 h-4 bg-slate-900 dark:bg-slate-700 rounded-full"></div>
+        <div class="flex items-center gap-1.5 text-xs">
+          <span class="text-blue-600 dark:text-sky-400 font-bold">SignPass</span>
+          <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
+        </div>
+      </div>
+
+      <!-- App Header: 3D Logo & Fast PASS Brand -->
+      <header class="sticky top-0 z-40 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-4 py-2.5 flex items-center justify-between shadow-xs">
+        <div class="flex items-center gap-2 cursor-pointer select-none" onclick="switchTab('intake')">
+          <div class="relative w-8 h-8 shrink-0 flex items-center justify-center transition-transform hover:scale-105 active:scale-95">
+            <img src="./assets/logo.png" alt="SignPass Logo" class="w-full h-full object-contain filter drop-shadow-[0_2px_8px_rgba(0,180,255,0.4)]" />
+          </div>
+          <div class="flex items-center leading-none">
+            <span class="font-extrabold text-[18px] tracking-tight text-slate-900 dark:text-white">Sign</span>
+            <span class="italic font-black text-[17px] tracking-tight bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-400 bg-clip-text text-transparent inline-block ml-0.5 pr-2">PASS</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <!-- Switch back to Kakao button -->
+          <button onclick="switchMainView('kakao')" title="카카오톡 채팅창 열기" class="px-2 py-1 rounded-xl bg-yellow-100 dark:bg-yellow-950/60 border border-yellow-300 dark:border-yellow-700 text-[#3c1e1e] dark:text-yellow-300 font-bold text-[11px] flex items-center gap-1 hover:bg-yellow-200 transition-colors">
+            <span>💬</span>
+            <span class="hidden xs:inline">카톡알림</span>
+          </button>
+
+          <!-- Sun/Moon Dark Mode Toggle -->
+          <button onclick="toggleDarkMode()" aria-label="Toggle dark mode" type="button" class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs shadow-xs">
+            <span class="text-xs">🌓</span>
+          </button>
+
+          <!-- Profile -->
+          <button onclick="switchTab('business')" type="button" class="w-8 h-8 rounded-full bg-blue-900 dark:bg-sky-600 text-white flex items-center justify-center font-bold text-xs shadow-sm hover:opacity-90 active:scale-95 transition-all">
+            <i data-lucide="user" class="w-4 h-4 text-white"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- ===================================================================== -->
+      <!-- APP TAB 1: [간판접수] (고객용 카톡 접수창 & 실시간 견적 산출) -->
+      <!-- ===================================================================== -->
+      <main id="tab-content-intake" class="tab-pane flex-1 px-4 py-3 space-y-3.5 pb-28 overflow-y-auto overscroll-contain">
+        <!-- Top Dual Segment Bar -->
+        <div class="bg-blue-50/80 dark:bg-slate-800/90 p-1 rounded-2xl border border-blue-100 dark:border-slate-700 flex items-center shadow-xs">
+          <button onclick="switchMainView('kakao')" class="flex-1 py-2 px-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-900 text-blue-700 dark:text-sky-400 shadow-xs border border-blue-100/50 dark:border-slate-800 flex items-center justify-center gap-1.5">
+            <i data-lucide="message-square" class="w-3.5 h-3.5 text-blue-600 dark:text-sky-400"></i>
+            <span>고객용 카톡 접수창</span>
+            <span class="w-2 h-2 rounded-full bg-[#fee500]"></span>
+          </button>
+          <button onclick="switchTab('permit')" class="flex-1 py-2 px-2 text-xs font-medium rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-700 flex items-center justify-center gap-1.5">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-slate-400"></i>
+            <span>허가·신고 신청</span>
+            <span class="w-4 h-4 rounded-full bg-amber-400 text-slate-900 text-[9px] font-black flex items-center justify-center">N</span>
+          </button>
+        </div>
+
+        <!-- Banner -->
+        <section class="rounded-2xl p-3.5 bg-gradient-to-br from-blue-50 via-white to-blue-50/40 dark:from-slate-800 dark:via-slate-800/90 dark:to-slate-900 border border-blue-100 dark:border-slate-700/80 shadow-xs">
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-600 text-white font-bold text-[10px] shadow-xs mb-1.5">
+            <i data-lucide="zap" class="w-3 h-3 fill-current"></i>
+            <span>빠른 간판 접수 & 카톡 연동</span>
+          </div>
+          <h2 class="text-sm font-extrabold text-slate-900 dark:text-white tracking-tight leading-snug">
+            매장 사진과 원하시는<br />스타일을 선택해 보세요
+          </h2>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+            카톡 알림톡으로 상담 카드가 실시간 즉시 발송됩니다.
+          </p>
+        </section>
+
+        <!-- 1. 매장 전면(파사드) 사진 첨부 -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-blue-600 dark:bg-sky-400"></span>
+              <label class="text-xs font-bold text-slate-900 dark:text-white">1. 매장 전면(파사드) 사진</label>
+            </div>
+            <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold" id="photo-status-badge">첨부완료 (📸)</span>
+          </div>
+
+          <div id="store-photo-box" onclick="togglePhotoUpload()" class="cursor-pointer rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100/80 p-2 flex flex-col items-center justify-center transition-all">
+            <div id="photo-uploaded-view" class="w-full flex flex-col items-center">
+              <div class="relative w-full h-28 rounded-lg overflow-hidden bg-slate-800">
+                <img id="app-facade-img" src="https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=600&q=80" alt="Cafe Facade" class="w-full h-full object-cover" />
+                <div class="absolute inset-0 bg-black/40 flex items-end p-2 justify-between">
+                  <span class="text-[11px] text-white font-bold flex items-center gap-1">
+                    <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i> 현장 사진 연동됨
+                  </span>
+                  <span class="text-[9px] bg-black/60 text-white px-2 py-0.5 rounded">터치해 변경</span>
+                </div>
+              </div>
+            </div>
+            <div id="photo-empty-view" class="hidden flex flex-col items-center py-4 text-center">
+              <i data-lucide="camera" class="w-6 h-6 text-blue-600 dark:text-sky-400 mb-1"></i>
+              <span class="text-xs font-bold text-slate-800 dark:text-slate-200">매장 전경 사진 첨부</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. 상호명 / 브랜드명 -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-blue-600 dark:bg-sky-400"></span>
+              <label class="text-xs font-bold text-slate-900 dark:text-white">2. 상호명 / 브랜드명</label>
+            </div>
+            <span class="text-[10px] text-blue-600 dark:text-sky-400 font-bold">카톡 카드 실시간 싱크</span>
+          </div>
+          <div class="flex items-center rounded-xl bg-slate-50 dark:bg-slate-800 px-3 py-2 border border-slate-200 dark:border-slate-700">
+            <i data-lucide="store" class="w-4 h-4 text-slate-400 mr-2"></i>
+            <input id="input-brand-name" oninput="syncBrandName(this.value)" type="text" value="모두의카페" placeholder="상호명을 입력하세요" class="w-full bg-transparent text-xs font-bold text-slate-900 dark:text-white focus:outline-none" />
+          </div>
+        </section>
+
+        <!-- 3. 업종 선택 -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-2">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-blue-600 dark:bg-sky-400"></span>
+            <label class="text-xs font-bold text-slate-900 dark:text-white">3. 업종 선택</label>
+          </div>
+          <div class="grid grid-cols-2 gap-2" id="category-group">
+            <button type="button" onclick="selectCategory(this, '카페/음료')" class="chip-cat active-chip py-2 px-2.5 rounded-xl border border-blue-600 dark:border-sky-500 bg-blue-50 dark:bg-sky-950/40 text-blue-700 dark:text-sky-300 font-bold text-xs flex items-center justify-between transition-all">
+              <span>☕ 카페/음료</span>
+              <i data-lucide="check" class="w-3.5 h-3.5 text-blue-600 dark:text-sky-400"></i>
+            </button>
+            <button type="button" onclick="selectCategory(this, '뷰티/미용')" class="chip-cat py-2 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium text-xs flex items-center justify-between transition-all">
+              <span>✂️ 뷰티/미용</span>
+              <i data-lucide="check" class="w-3.5 h-3.5 opacity-0"></i>
+            </button>
+            <button type="button" onclick="selectCategory(this, '학원/사무실')" class="chip-cat py-2 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium text-xs flex items-center justify-between transition-all">
+              <span>📚 학원/사무실</span>
+              <i data-lucide="check" class="w-3.5 h-3.5 opacity-0"></i>
+            </button>
+            <button type="button" onclick="selectCategory(this, '기타 소상공인')" class="chip-cat py-2 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium text-xs flex items-center justify-between transition-all">
+              <span>🏪 일반 소상공인</span>
+              <i data-lucide="check" class="w-3.5 h-3.5 opacity-0"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- 4. 설치층수 & 간판종류 -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-2">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-blue-600 dark:bg-sky-400"></span>
+            <label class="text-xs font-bold text-slate-900 dark:text-white">4. 설치층수 & 희망 간판</label>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" onclick="selectFloor(this, 1)" class="floor-chip py-2 px-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium text-xs text-center transition-all">
+              1층
+            </button>
+            <button type="button" onclick="selectFloor(this, 2)" class="floor-chip py-2 px-2 rounded-xl border border-blue-600 dark:border-sky-500 bg-blue-50 dark:bg-sky-950/40 text-blue-700 dark:text-sky-300 font-bold text-xs text-center transition-all">
+              2층 전면
+            </button>
+            <button type="button" onclick="selectFloor(this, 3)" class="floor-chip py-2 px-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium text-xs text-center transition-all">
+              3층+ (크레인)
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-1" id="sign-type-group">
+            <button type="button" onclick="selectSignType(this, 'LED 채널간판', 140, 175)" class="sign-chip py-2 px-2.5 rounded-xl border border-blue-600 dark:border-sky-500 bg-blue-50 dark:bg-sky-950/40 text-blue-700 dark:text-sky-300 font-bold text-xs flex items-center justify-between transition-all">
+              <span>✨ LED 채널간판</span>
+              <i data-lucide="check" class="w-3.5 h-3.5 text-blue-600 dark:text-sky-400"></i>
+            </button>
+            <button type="button" onclick="selectSignType(this, '갈바 철제 타공', 170, 210)" class="sign-chip py-2 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium text-xs flex items-center justify-between transition-all">
+              <span>🛡️ 갈바 철제 타공</span>
+              <i data-lucide="check" class="w-3.5 h-3.5 opacity-0"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- 실시간 견적 요약 카드 -->
+        <section class="rounded-2xl p-3.5 bg-blue-50/70 dark:bg-slate-800/80 border border-blue-100 dark:border-slate-700 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
+              <i data-lucide="calculator" class="w-3.5 h-3.5 text-blue-600 dark:text-sky-400"></i>
+              실시간 예상 견적 계산
+            </span>
+            <span class="text-base font-black text-blue-700 dark:text-sky-400" id="calc-total-price">약 155 ~ 190 만원</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button type="button" onclick="openCallClientModal()" class="py-2.5 px-3 bg-white dark:bg-slate-900 hover:bg-slate-50 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs">
+              <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-600 dark:text-slate-300"></i>
+              <span>전화 무료상담</span>
+            </button>
+            <button type="button" onclick="submitDirectQuote()" class="py-2.5 px-3 bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-xs">
+              <i data-lucide="zap" class="w-3.5 h-3.5 fill-current"></i>
+              <span>이 견적으로 즉시 접수</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Primary Action Button: 간판 상담 카드 발송하기 -->
+        <section class="space-y-1.5 pt-1">
+          <button type="button" onclick="sendConsultCardToKakao()" class="w-full py-3.5 px-4 bg-[#fee500] hover:bg-yellow-400 text-slate-950 rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition-all">
+            <i data-lucide="send" class="w-4 h-4 text-[#3c1e1e]"></i>
+            <span>간판 상담 카드 카톡으로 발송하기</span>
+          </button>
+          <p class="text-[10px] text-center text-slate-400 dark:text-slate-500 leading-tight">
+            발송 시 카카오톡 채팅창 알림톡 카드가 실시간 갱신되어 즉시 이동합니다.
+          </p>
+        </section>
+      </main>
+
+      <!-- ===================================================================== -->
+      <!-- APP TAB 2: [인허가현황] (구청 허가·신고 AUTO, 서류 4종 패키지, 정부24) -->
+      <!-- ===================================================================== -->
+      <main id="tab-content-permit" class="tab-pane hidden flex-1 px-4 py-3 space-y-3.5 pb-28 overflow-y-auto overscroll-contain">
+        <!-- Top Dual Segment Bar -->
+        <div class="bg-blue-50/80 dark:bg-slate-800/90 p-1 rounded-2xl border border-blue-100 dark:border-slate-700 flex items-center shadow-xs">
+          <button onclick="switchMainView('kakao')" class="flex-1 py-2 px-2 text-xs font-medium rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-700 flex items-center justify-center gap-1.5">
+            <i data-lucide="message-square" class="w-3.5 h-3.5 text-slate-400"></i>
+            <span>고객용 카톡 접수창</span>
+          </button>
+          <button class="flex-1 py-2 px-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-900 text-blue-700 dark:text-sky-400 shadow-xs border border-blue-100/50 dark:border-slate-800 flex items-center justify-center gap-1.5">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-blue-600 dark:text-sky-400"></i>
+            <span>인허가·신고 신청 (AUTO)</span>
+            <span class="w-4 h-4 rounded-full bg-amber-400 text-slate-900 text-[9px] font-black flex items-center justify-center">N</span>
+          </button>
+        </div>
+
+        <!-- Live Reception Alert Card -->
+        <section id="permit-linked-banner" class="rounded-2xl p-3.5 bg-white dark:bg-slate-900 shadow-xs relative overflow-hidden border border-slate-200/90 dark:border-slate-800 transition-all">
+          <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-amber-400"></div>
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-1.5 text-slate-900 dark:text-white">
+              <i data-lucide="bell-ring" class="w-4 h-4 text-amber-500 animate-pulse"></i>
+              <h3 class="text-xs font-bold tracking-tight" id="permit-status-header">신규 카톡 연동 접수 건 [모두의카페 · 2층 전면]</h3>
+            </div>
+            <span class="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold">
+              서류작성 완료
+            </span>
+          </div>
+          <div class="p-2.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl space-y-1.5 border border-slate-200/70 dark:border-slate-700/60 text-[11px]">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500 dark:text-slate-400">접수 상태</span>
+              <span class="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
+                <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> 원클릭 도안·서류 4종 준비 완료
+              </span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500 dark:text-slate-400">관할 지자체</span>
+              <span class="font-bold text-blue-700 dark:text-sky-400" id="permit-disp-jurisdiction">경기도 양주시청 도시경관과 (조례 자동적용)</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- [Step 1] 사업장 및 광고주 정보 -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-blue-600 dark:bg-sky-400"></span>
+              <h3 class="text-xs font-bold text-slate-900 dark:text-white">[Step 1] 사업장 및 광고주 정보</h3>
+            </div>
+            <span class="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold flex items-center gap-1">
+              <i data-lucide="check" class="w-3 h-3"></i> 카톡 자동매핑 완료
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div class="space-y-1">
+              <label class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">상호명 (표시내용)</label>
+              <div class="rounded-xl bg-slate-50 dark:bg-slate-800 px-3 py-2 border border-slate-200 dark:border-slate-700">
+                <input id="permit-input-brand" type="text" value="모두의카페" readonly class="w-full bg-transparent text-xs font-bold text-slate-900 dark:text-white focus:outline-none" />
+              </div>
+            </div>
+            <div class="space-y-1">
+              <label class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">광고주 / 대표자</label>
+              <div class="rounded-xl bg-slate-50 dark:bg-slate-800 px-3 py-2 border border-slate-200 dark:border-slate-700">
+                <input type="text" value="윤수병 (010-5595-8137)" readonly class="w-full bg-transparent text-xs text-slate-800 dark:text-slate-200 focus:outline-none" />
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-1">
+            <div class="flex items-center justify-between">
+              <label class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">설치 현장 도로명 주소</label>
+              <button type="button" onclick="openAddressSearchModal()" class="text-[11px] text-blue-700 dark:text-sky-400 font-bold hover:underline">[주소검색/변경]</button>
+            </div>
+            <div class="flex items-center rounded-xl bg-slate-50 dark:bg-slate-800 px-3 py-2 border border-slate-200 dark:border-slate-700">
+              <i data-lucide="map-pin" class="w-4 h-4 text-slate-400 mr-2 shrink-0"></i>
+              <input id="permit-input-addr" type="text" value="경기도 양주시 회천남로 123 (옥정동, 중앙타워)" class="w-full bg-transparent text-xs text-slate-800 dark:text-white focus:outline-none" />
+            </div>
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">설치 위치 세부</label>
+            <div class="flex items-center rounded-xl bg-slate-50 dark:bg-slate-800 px-3 py-2 border border-slate-200 dark:border-slate-700">
+              <i data-lucide="layers" class="w-4 h-4 text-slate-400 mr-2 shrink-0"></i>
+              <input id="permit-input-loc" type="text" value="2층 전면 파사드 상단" class="w-full bg-transparent text-xs text-slate-800 dark:text-white focus:outline-none" />
+            </div>
+          </div>
+        </section>
+
+        <!-- [Step 2] 규격 및 사양 연산 -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-blue-600 dark:bg-sky-400"></span>
+              <h3 class="text-xs font-bold text-slate-900 dark:text-white">[Step 2] 옥외광고물 규격 및 표시 사양</h3>
+            </div>
+            <span class="px-2 py-0.5 rounded-full bg-blue-700 text-white text-[10px] font-bold">
+              조례 자동판별
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div class="space-y-1">
+              <label class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">가로 규격 (m)</label>
+              <div class="flex items-center rounded-xl bg-slate-50 dark:bg-slate-800 px-3 py-2 border border-slate-200 dark:border-slate-700">
+                <i data-lucide="ruler" class="w-3.5 h-3.5 text-slate-400 mr-1.5"></i>
+                <input id="permit-w-input" oninput="calculatePermit()" type="number" step="0.1" value="4.2" class="w-full bg-transparent text-xs font-bold text-blue-700 dark:text-sky-400 focus:outline-none" />
+                <span class="text-xs text-slate-400 font-mono">m</span>
+              </div>
+            </div>
+            <div class="space-y-1">
+              <label class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">세로 규격 (m)</label>
+              <div class="flex items-center rounded-xl bg-slate-50 dark:bg-slate-800 px-3 py-2 border border-slate-200 dark:border-slate-700">
+                <i data-lucide="move-vertical" class="w-3.5 h-3.5 text-slate-400 mr-1.5"></i>
+                <input id="permit-h-input" oninput="calculatePermit()" type="number" step="0.1" value="0.8" class="w-full bg-transparent text-xs font-bold text-blue-700 dark:text-sky-400 focus:outline-none" />
+                <span class="text-xs text-slate-400 font-mono">m</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 연산 결과 -->
+          <div class="rounded-xl p-3 bg-blue-50/70 dark:bg-slate-800/80 border border-blue-100 dark:border-slate-700 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                <i data-lucide="calculator" class="w-3.5 h-3.5 text-blue-600 dark:text-sky-400"></i>
+                표시 면적 자동 연산 및 조례 판별
+              </span>
+              <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                <i data-lucide="check-circle" class="w-3 h-3"></i> 적합 규격
+              </span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <div class="bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200/80 dark:border-slate-800">
+                <span class="text-[9px] text-slate-400 uppercase font-mono block">총 표시 면적</span>
+                <span class="text-base font-black text-blue-700 dark:text-sky-400 mt-0.5 block" id="permit-calc-area">3.36 ㎡</span>
+                <span class="text-[9px] text-slate-400" id="permit-calc-desc">4.2m × 0.8m 기준</span>
+              </div>
+              <div class="bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200/80 dark:border-slate-800">
+                <span class="text-[9px] text-slate-400 uppercase font-mono block">행정 구분</span>
+                <span class="text-xs font-bold text-slate-900 dark:text-white mt-0.5 block" id="permit-calc-status">표시 신고 대상</span>
+                <span class="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold" id="permit-calc-inspect">안전도검사 비대상 (기준 통과)</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- [Step 3] 첨부 서류 4종 패키지 -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-2.5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-blue-600 dark:bg-sky-400"></span>
+              <h3 class="text-xs font-bold text-slate-900 dark:text-white">구청 제출 자동생성 패키지 (4종 완성)</h3>
+            </div>
+            <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">100% 자동완성</span>
+          </div>
+
+          <div class="space-y-1.5 text-xs">
+            <div class="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700 cursor-pointer hover:bg-blue-50/50" onclick="openPdfModal(0)">
+              <div class="flex items-center gap-2">
+                <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                <span class="font-medium text-slate-800 dark:text-slate-200 text-[11px]">1. 옥외광고물 표시 허가(신고) 신청서 (별지 제1호서식)</span>
+              </div>
+              <span class="text-[10px] font-bold text-blue-600 dark:text-sky-400">미리보기 &gt;</span>
+            </div>
+
+            <div class="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700 cursor-pointer hover:bg-blue-50/50" onclick="openPdfModal(1)">
+              <div class="flex items-center gap-2">
+                <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                <span class="font-medium text-slate-800 dark:text-slate-200 text-[11px]">2. 광고물 원색도안 및 구조시방서</span>
+              </div>
+              <span class="text-[10px] font-bold text-blue-600 dark:text-sky-400">미리보기 &gt;</span>
+            </div>
+
+            <div class="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700 cursor-pointer hover:bg-blue-50/50" onclick="openPdfModal(2)">
+              <div class="flex items-center gap-2">
+                <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                <span class="font-medium text-slate-800 dark:text-slate-200 text-[11px]">3. 설치장소 원색사진 및 입면 배치도</span>
+              </div>
+              <span class="text-[10px] font-bold text-blue-600 dark:text-sky-400">미리보기 &gt;</span>
+            </div>
+
+            <div class="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700 cursor-pointer hover:bg-blue-50/50" onclick="openPdfModal(3)">
+              <div class="flex items-center gap-2">
+                <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                <span class="font-medium text-slate-800 dark:text-slate-200 text-[11px]">4. 건물(점포) 사용승낙서 증빙양식 (자가/임대)</span>
+              </div>
+              <span class="text-[10px] font-bold text-blue-600 dark:text-sky-400">미리보기 &gt;</span>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="space-y-2 pt-2">
+            <button type="button" onclick="openPdfModal(0)" class="w-full py-3 px-4 bg-blue-900 hover:bg-blue-950 dark:bg-blue-800 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition-all">
+              <i data-lucide="file-text" class="w-4 h-4"></i>
+              <span>구청 제출용 서류 일괄 다운로드 & 출력</span>
+            </button>
+            <button type="button" onclick="openGov24Modal()" class="w-full py-3 px-4 bg-amber-400 hover:bg-amber-500 text-slate-950 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-sm active:scale-[0.99] transition-all">
+              <i data-lucide="send" class="w-3.5 h-3.5 fill-current"></i>
+              <span>전자민원창구(정부24·세움터) 원클릭 대행 접수</span>
+            </button>
+          </div>
+        </section>
+      </main>
+
+      <!-- ===================================================================== -->
+      <!-- APP TAB 3: [도면·입면도] (CAD 원색도안, 3D 입면 합성, 시방서) -->
+      <!-- ===================================================================== -->
+      <main id="tab-content-cad" class="tab-pane hidden flex-1 px-4 py-3 space-y-3.5 pb-28 overflow-y-auto overscroll-contain">
+        <!-- Sub-tabs -->
+        <nav class="bg-blue-50/70 dark:bg-slate-800/90 p-1 rounded-2xl border border-blue-100 dark:border-slate-700 flex items-center shadow-xs">
+          <button id="cad-subtab-1" onclick="switchCadSubTab(1)" class="flex-1 py-1.5 px-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-900 text-blue-700 dark:text-sky-400 shadow-xs border border-blue-100/50 dark:border-slate-800 flex items-center justify-center gap-1 transition-all">
+            <i data-lucide="pen-tool" class="w-3 h-3"></i>
+            <span>CAD 원색도안</span>
+          </button>
+          <button id="cad-subtab-2" onclick="switchCadSubTab(2)" class="flex-1 py-1.5 px-2 text-xs font-medium rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-700 flex items-center justify-center gap-1 transition-all">
+            <i data-lucide="box" class="w-3 h-3"></i>
+            <span>3D 입면 합성</span>
+          </button>
+          <button id="cad-subtab-3" onclick="switchCadSubTab(3)" class="flex-1 py-1.5 px-2 text-xs font-medium rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-700 flex items-center justify-center gap-1 transition-all">
+            <i data-lucide="file-text" class="w-3 h-3"></i>
+            <span>자재·시방서</span>
+          </button>
+        </nav>
+
+        <!-- Subtab Content 1: CAD 2D Elevation Blueprint -->
+        <div id="cad-pane-1" class="space-y-3">
+          <section class="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-blue-600 dark:bg-sky-400"></span>
+                <h3 class="text-xs font-bold text-slate-900 dark:text-white tracking-tight">구청 심의용 LED 채널 원색도안</h3>
+              </div>
+              <span class="text-[10px] font-bold text-blue-700 dark:text-sky-400 bg-blue-50 dark:bg-slate-800 border border-blue-200 dark:border-slate-700 px-2 py-0.5 rounded-md">
+                SCALE 1:50
+              </span>
+            </div>
+
+            <!-- Blueprint Viewport -->
+            <div class="cad-blueprint-grid rounded-xl border border-slate-800 p-3 text-white overflow-hidden relative shadow-inner">
+              <div class="flex justify-between items-center text-[9px] text-slate-400 font-mono pb-2 border-b border-slate-800/80">
+                <div class="flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span>
+                  <span class="text-teal-300 font-semibold">DWG: SP-2026-CAD-0915</span>
+                </div>
+                <span class="text-slate-400">양주시청 심의 표준 규격</span>
+              </div>
+
+              <div class="py-6 px-1 flex flex-col items-center justify-center relative">
+                <!-- Width dimension line -->
+                <div class="w-full max-w-[260px] flex flex-col items-center mb-2">
+                  <div class="flex items-center justify-between w-full text-[10px] font-mono text-cyan-300 font-semibold px-1">
+                    <span>◀</span>
+                    <span>W: 4,200 mm <span class="text-[8px] text-cyan-400/80 font-normal">(±15mm)</span></span>
+                    <span>▶</span>
+                  </div>
+                  <div class="w-full border-b border-dashed border-cyan-500/50 mt-0.5"></div>
+                </div>
+
+                <!-- Channel Sign Box -->
+                <div id="sign-render-body" class="relative w-full max-w-[260px] bg-slate-950/85 border-2 border-cyan-400/40 rounded-lg py-3 px-4 shadow-[0_0_20px_rgba(0,180,255,0.18)] flex items-center justify-center my-1">
+                  <!-- Height Indicator -->
+                  <div class="absolute -left-6 top-1/2 -translate-y-1/2 flex flex-col items-center text-[8px] font-mono text-cyan-300 leading-tight">
+                    <span>▲</span>
+                    <span class="py-0.5">800</span>
+                    <span>▼</span>
+                  </div>
+
+                  <!-- Text & Coffee Cup LED Signage (Yellow Light) -->
+                  <div class="flex items-center gap-2">
+                    <div id="led-bulb" class="coffee-sign-on flex items-center justify-center transition-all duration-300 mr-0.5" title="커피잔 LED 조명 로고">
+                      <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <!-- 커피 김 모락모락 라인 -->
+                        <path d="M6.5 2c.4.8.4 1.7 0 2.5" />
+                        <path d="M10.5 1.5c.4 1 .4 2 0 3" />
+                        <path d="M14.5 2c.4.8.4 1.7 0 2.5" />
+                        <!-- 커피잔 컵 본체 (반투명 노란빛 채움) -->
+                        <path d="M3 8.5h12v4a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5v-4z" fill="currentColor" fill-opacity="0.35" />
+                        <!-- 커피잔 손잡이 -->
+                        <path d="M15 9.5h1.5a2.5 2.5 0 0 1 0 5H15" />
+                        <!-- 컵 받침 접시 -->
+                        <line x1="2" y1="20.5" x2="16" y2="20.5" stroke-width="2" />
+                      </svg>
+                    </div>
+                    <span id="signage-text" class="signage-glow-on text-white font-extrabold text-base tracking-wider">모 두 의 카 페</span>
+                  </div>
+
+                  <!-- Depth -->
+                  <div class="absolute -right-6 top-1/2 -translate-y-1/2 text-[8px] font-mono text-cyan-300 flex flex-col items-center leading-tight">
+                    <span>D</span>
+                    <span>90</span>
+                    <span>mm</span>
+                  </div>
+                </div>
+
+                <div class="mt-2.5 px-2 py-0.5 rounded bg-slate-900/90 border border-slate-700 text-[8px] text-slate-300 font-mono tracking-tight text-center">
+                  전면 발광 백색 에폭시 PC판 + 알루미늄 1.2T 갈바 프레임
+                </div>
+              </div>
+
+              <div class="pt-2 border-t border-slate-800/80 flex justify-between items-center text-[8px] text-slate-400 font-mono">
+                <span class="truncate">광원: 삼성 3구 LED 모듈 5700K (12V)</span>
+                <span class="flex items-center gap-1 text-emerald-400 font-semibold flex-shrink-0">
+                  <span class="w-1 h-1 rounded-full bg-emerald-400"></span>
+                  풍압 45m/s 안전성 통과
+                </span>
+              </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button id="btn-toggle-light" onclick="toggleCadLight()" class="py-2 px-3 bg-blue-50/70 hover:bg-blue-100 dark:bg-slate-800 text-blue-700 dark:text-sky-300 border border-blue-200/80 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors" type="button">
+                <span class="text-amber-500">💡</span>
+                <span id="light-btn-text">조명 소등(끄기)</span>
+              </button>
+              <button onclick="openZoomModal()" class="py-2 px-3 bg-blue-50/70 hover:bg-blue-100 dark:bg-slate-800 text-blue-700 dark:text-sky-300 border border-blue-200/80 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors" type="button">
+                <i data-lucide="zoom-in" class="w-3.5 h-3.5 text-blue-600 dark:text-sky-400"></i>
+                <span>도면 200% 정밀 확대</span>
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <!-- Subtab Content 2: 3D Facade Elevation Simulation -->
+        <div id="cad-pane-2" class="hidden space-y-3">
+          <section class="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold text-slate-900 dark:text-white">3D 현장 파사드 입면 실사 합성</h3>
+              <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md">실측 정밀 매핑</span>
+            </div>
+
+            <!-- 3D Mockup Container -->
+            <div class="relative w-full h-56 rounded-xl overflow-hidden bg-slate-900 border border-slate-700">
+              <img src="https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=600&q=80" alt="매장 전경" class="w-full h-full object-cover brightness-90" />
+              
+              <!-- Synthesized Signage Overlay -->
+              <div class="absolute top-[28%] left-1/2 -translate-x-1/2 w-[72%] bg-slate-900/90 border-2 border-amber-300/80 rounded-md py-1.5 px-3 flex items-center justify-center shadow-[0_0_20px_rgba(254,229,0,0.6)] backdrop-blur-xs">
+                <span class="text-amber-300 font-black text-xs sm:text-sm tracking-wider drop-shadow-[0_0_6px_#fee500]" id="facade-overlay-text">모 두 의 카 페</span>
+              </div>
+
+              <!-- Measurement Lines on Building -->
+              <div class="absolute top-[24%] left-[14%] right-[14%] border-t border-cyan-400 text-center">
+                <span class="bg-slate-950/80 text-cyan-300 text-[9px] font-mono px-1.5 py-0.2 rounded border border-cyan-500/60">설치 가로폭: 4,200 mm</span>
+              </div>
+            </div>
+
+            <p class="text-[11px] text-slate-500 dark:text-slate-400">
+              구청 도시디자인과 심의 기준에 부합하도록 건물 파사드 비율과 색채 대비를 실시간 검증합니다.
+            </p>
+          </section>
+        </div>
+
+        <!-- Subtab Content 3: Material Specifications & Standards -->
+        <div id="cad-pane-3" class="hidden space-y-3">
+          <section class="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3 text-xs">
+            <h3 class="font-bold text-slate-900 dark:text-white">자재 규격 및 시방서 (행정 표준)</h3>
+            <div class="space-y-1.5 font-mono text-[11px]">
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex justify-between">
+                <span class="text-slate-500">본체 프레임</span>
+                <span class="font-bold text-slate-800 dark:text-slate-200">갈바(EGI) 1.2T 절곡 분체도장</span>
+              </div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex justify-between">
+                <span class="text-slate-500">문자 채널</span>
+                <span class="font-bold text-slate-800 dark:text-slate-200">광확산 PC 3T + 에폭시 성형</span>
+              </div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex justify-between">
+                <span class="text-slate-500">조명 모듈</span>
+                <span class="font-bold text-slate-800 dark:text-slate-200">삼성 LED 3구 IP68 완전방수</span>
+              </div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex justify-between">
+                <span class="text-slate-500">전원 공급 (SMPS)</span>
+                <span class="font-bold text-slate-800 dark:text-slate-200">방우형 정전압 SMPS 300W (KC인증)</span>
+              </div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex justify-between">
+                <span class="text-slate-500">구조 안전율</span>
+                <span class="font-bold text-emerald-600 dark:text-emerald-400">설계풍속 45m/s (안전계수 1.45)</span>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Download & Submit Actions -->
+        <section class="space-y-2 pt-1">
+          <button onclick="downloadCadPackage()" class="w-full py-3 px-4 bg-blue-900 hover:bg-blue-950 dark:bg-blue-800 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>도면 패키지 (DWG / PDF) 다운로드</span>
+          </button>
+        </section>
+      </main>
+
+      <!-- ===================================================================== -->
+      <!-- APP TAB 4: [사업자관리] (시공 파트너 대시보드 & 필증 보관함) -->
+      <!-- ===================================================================== -->
+      <main id="tab-content-business" class="tab-pane hidden flex-1 px-4 py-3 space-y-3.5 pb-28 overflow-y-auto overscroll-contain">
+        <!-- Partner Profile -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/90 dark:border-slate-800 shadow-xs flex items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl bg-blue-900 dark:bg-sky-600 text-white flex items-center justify-center font-black text-sm shadow-sm">
+            빛샘
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <h2 class="font-bold text-slate-900 dark:text-white text-xs">빛샘애드(옥외광고물 제작 시공 전문)</h2>
+              <span class="px-1.5 py-0.2 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[9px] font-bold">인증 파트너</span>
+            </div>
+            <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+              사업자: 127-43-78358 경기 양주/ 서울 경기 북부 총괄
+            </p>
+          </div>
+        </section>
+
+        <!-- Stats Grid -->
+        <section class="grid grid-cols-3 gap-2">
+          <div class="bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800 text-center">
+            <span class="text-[9px] text-slate-400 block">카톡 상담</span>
+            <span class="text-base font-black text-blue-700 dark:text-sky-400">4 건</span>
+          </div>
+          <div class="bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800 text-center">
+            <span class="text-[9px] text-slate-400 block">심의 대기</span>
+            <span class="text-base font-black text-amber-500">2 건</span>
+          </div>
+          <div class="bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800 text-center">
+            <span class="text-[9px] text-slate-400 block">허가 완료</span>
+            <span class="text-base font-black text-emerald-600">38 건</span>
+          </div>
+        </section>
+
+        <!-- Projects -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold text-slate-900 dark:text-white">최근 인허가 및 시공 관리 현황</h3>
+            <span class="text-[10px] text-slate-400">3건 진행</span>
+          </div>
+
+          <div class="space-y-1.5 text-xs">
+            <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-slate-900 dark:text-white">모두의카페 (옥정중앙)</span>
+                  <span class="text-[9px] bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-1.5 py-0.2 rounded font-bold">카톡 연동</span>
+                </div>
+                <span class="text-[10px] text-slate-400 block mt-0.5">양주시 회천남로 · 4.2m 채널</span>
+              </div>
+              <button onclick="switchTab('permit')" class="px-2 py-1 bg-blue-600 text-white font-bold text-[10px] rounded-lg">
+                서류보기
+              </button>
+            </div>
+
+            <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-slate-900 dark:text-white">스타일헤어 (강남역)</span>
+                  <span class="text-[9px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-1.5 py-0.2 rounded font-bold">허가 완료</span>
+                </div>
+                <span class="text-[10px] text-slate-400 block mt-0.5">강남구 테헤란로 · 필증 교부</span>
+              </div>
+              <button onclick="openLicenseModal()" class="px-2 py-1 bg-emerald-600 text-white font-bold text-[10px] rounded-lg">
+                필증출력
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Config Menu Buttons -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-1.5 text-xs">
+          <button onclick="openStampModal()" class="w-full py-2 px-2.5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-slate-700 dark:text-slate-300">
+            <span class="flex items-center gap-2"><i data-lucide="stamp" class="w-4 h-4 text-blue-600"></i> 시공업체 직인 및 전자서명 관리</span>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+          </button>
+          <button onclick="openCertModal()" class="w-full py-2 px-2.5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-slate-700 dark:text-slate-300">
+            <span class="flex items-center gap-2"><i data-lucide="key" class="w-4 h-4 text-blue-600"></i> 정부24 및 지자체 세움터 인증서 연동</span>
+            <span class="text-[10px] text-emerald-600 font-bold">정상연결</span>
+          </button>
+        </section>
+      </main>
+
+      <!-- Bottom Common Navigation (4 Tabs) -->
+      <nav class="absolute bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 px-2 pt-2 pb-safe flex justify-around items-center z-40">
+        <button id="nav-btn-intake" onclick="switchTab('intake')" type="button" class="nav-item flex flex-col items-center py-1 px-3 text-blue-700 dark:text-sky-400 transition-colors">
+          <i data-lucide="message-square" class="w-4 h-4 stroke-[2.2]"></i>
+          <span class="text-[10px] font-bold mt-1 text-blue-700 dark:text-sky-400">간판접수</span>
+        </button>
+
+        <button id="nav-btn-permit" onclick="switchTab('permit')" type="button" class="nav-item flex flex-col items-center py-1 px-3 text-slate-400 hover:text-slate-600 transition-colors">
+          <i data-lucide="shield-check" class="w-4 h-4 stroke-[1.8]"></i>
+          <span class="text-[10px] font-medium mt-1">인허가현황</span>
+        </button>
+
+        <button id="nav-btn-cad" onclick="switchTab('cad')" type="button" class="nav-item flex flex-col items-center py-1 px-3 text-slate-400 hover:text-slate-600 transition-colors">
+          <i data-lucide="compass" class="w-4 h-4 stroke-[1.8]"></i>
+          <span class="text-[10px] font-medium mt-1">도면·입면도</span>
+        </button>
+
+        <button id="nav-btn-business" onclick="switchTab('business')" type="button" class="nav-item flex flex-col items-center py-1 px-3 text-slate-400 hover:text-slate-600 transition-colors">
+          <i data-lucide="store" class="w-4 h-4 stroke-[1.8]"></i>
+          <span class="text-[10px] font-medium mt-1">사업자관리</span>
+        </button>
+      </nav>
+    </section>
+
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODALS SYSTEM (모든 세부 기능 완벽 구현) -->
+  <!-- ========================================================================= -->
+
+  <!-- MODAL 1: 고객 전화 통화 연결 모달 -->
+  <div id="modal-call" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+            <i data-lucide="phone-call" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white">고객 전화 상담 연결</h3>
+            <span class="text-[10px] text-slate-400">빛샘애드 시공팀 &gt; 고객 통화</span>
+          </div>
+        </div>
+        <button onclick="closeModal('modal-call')" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+
+      <div class="bg-slate-50 dark:bg-slate-800 p-3.5 rounded-2xl space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+        <div class="flex justify-between">
+          <span class="text-slate-400">고객명:</span>
+          <span class="font-bold text-slate-900 dark:text-white">윤수병 고객님</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">연락처:</span>
+          <span class="font-mono font-bold text-blue-600 dark:text-sky-400">010-5595-8137</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">상담 상호:</span>
+          <span class="font-bold text-slate-900 dark:text-white" id="call-modal-brand">모두의카페</span>
+        </div>
+      </div>
+
+      <div class="space-y-1.5">
+        <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300">상담 메모</label>
+        <textarea id="call-memo" rows="2" placeholder="통화 상담 메모를 기록하세요 (예: 2층 사다리 시공 일정 협의)" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent text-slate-900 dark:text-white focus:outline-none"></textarea>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 pt-1">
+        <a href="tel:010-5595-8137" onclick="showToast('010-5595-8137 전화 연결 중...')" class="py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm">
+          <i data-lucide="phone" class="w-4 h-4"></i>
+          <span>전화 걸기</span>
+        </a>
+        <button onclick="saveCallMemo()" type="button" class="py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl">
+          메모 저장 & 닫기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: 구청 법정 서식 4종 종합 뷰어 모달 (인쇄 & PDF 다운로드) -->
+  <div id="modal-pdf" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-3 sm:p-4">
+    <div class="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-2xl flex flex-col border border-slate-200 dark:border-slate-800 max-h-[90vh]">
+      <!-- Modal Header -->
+      <div class="px-4 py-3 bg-blue-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="file-check" class="w-4 h-4 text-emerald-400"></i>
+          <span class="text-xs font-bold">지자체 법정 옥외광고물 인허가 공인 서식 (4종 패키지)</span>
+        </div>
+        <button onclick="closeModal('modal-pdf')" class="text-white hover:opacity-80">✕</button>
+      </div>
+
+      <!-- 4종 서식 탭 스위처 -->
+      <div class="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 px-2 pt-2 gap-1 overflow-x-auto text-[11px]">
+        <button id="doc-tab-0" onclick="switchDocTab(0)" class="px-3 py-1.5 rounded-t-xl font-bold bg-white dark:bg-slate-900 text-blue-700 dark:text-sky-400 border-t border-x border-slate-200 dark:border-slate-800">
+          1. 신청서(별지1호)
+        </button>
+        <button id="doc-tab-1" onclick="switchDocTab(1)" class="px-3 py-1.5 rounded-t-xl font-medium text-slate-500 hover:text-slate-800">
+          2. 원색도안·시방서
+        </button>
+        <button id="doc-tab-2" onclick="switchDocTab(2)" class="px-3 py-1.5 rounded-t-xl font-medium text-slate-500 hover:text-slate-800">
+          3. 입면배치도
+        </button>
+        <button id="doc-tab-3" onclick="switchDocTab(3)" class="px-3 py-1.5 rounded-t-xl font-medium text-slate-500 hover:text-slate-800">
+          4. 사용승낙서
+        </button>
+      </div>
+
+      <!-- Document Body (Scrollable Legal Paper Simulation) -->
+      <div class="p-4 overflow-y-auto flex-1 space-y-3 bg-slate-100 dark:bg-slate-950 text-xs" id="doc-content-container">
+        <!-- Content inserted dynamically by switchDocTab() -->
+      </div>
+
+      <!-- Bottom Action Controls -->
+      <div class="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
+        <button onclick="window.print()" type="button" class="py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5">
+          <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+          <span>서류 인쇄하기</span>
+        </button>
+        <button onclick="downloadPdfSimulate()" type="button" class="py-2.5 px-4 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>4종 일괄 PDF(.ZIP) 다운로드</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: 정부24 및 지자체 세움터 원클릭 대행 접수 시뮬레이터 -->
+  <div id="modal-gov" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center font-bold">
+            <i data-lucide="send" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white">정부24 · 세움터 전자민원 대행</h3>
+            <span class="text-[10px] text-slate-400">지자체 옥외광고물 표시 신고 전산 접수</span>
+          </div>
+        </div>
+        <button onclick="closeModal('modal-gov')" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+
+      <!-- Step Progress Bars -->
+      <div class="space-y-2.5 text-xs">
+        <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-2 border border-slate-200 dark:border-slate-700">
+          <div class="flex items-center justify-between">
+            <span class="font-bold flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i> 1단계: 조례 적합성 검증
+            </span>
+            <span class="text-[10px] text-emerald-600 font-bold">PASS</span>
+          </div>
+          <p class="text-[10px] text-slate-500">양주시 조례 기준 5㎡ 미만 벽면간판 요건 자동 통과</p>
+        </div>
+
+        <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-2 border border-slate-200 dark:border-slate-700">
+          <div class="flex items-center justify-between">
+            <span class="font-bold flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i> 2단계: 공동인증서 전자서명
+            </span>
+            <span class="text-[10px] text-emerald-600 font-bold">서명완료</span>
+          </div>
+          <p class="text-[10px] text-slate-500">빛샘애드 시공사업자 공인 전자직인 자동 날인 완료</p>
+        </div>
+
+        <div class="p-3 bg-blue-50 dark:bg-slate-800/90 rounded-xl space-y-1.5 border border-blue-200 dark:border-blue-900">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-blue-900 dark:text-sky-300">접수 번호 발급 완료</span>
+            <span class="text-xs font-mono font-bold text-blue-700 dark:text-sky-400">제2026-양주-0842호</span>
+          </div>
+          <p class="text-[10px] text-slate-600 dark:text-slate-400">
+            담당 공무원 배정 완료 (양주시청 도시경관과 광고물관리팀)
+          </p>
+        </div>
+      </div>
+
+      <button onclick="completeGovReception()" type="button" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md">
+        접수 확인 완료 & 고객에게 카톡 알림 통보
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL 4: 도로명 주소 검색 모달 -->
+  <div id="modal-address" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white">설치 현장 도로명 주소 검색</h3>
+        <button onclick="closeModal('modal-address')" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+
+      <div class="space-y-2 text-xs">
+        <div class="p-3 rounded-xl border border-blue-500 bg-blue-50/40 dark:bg-slate-800 cursor-pointer hover:bg-blue-100 transition-colors" onclick="selectAddressOption('경기도 양주시 회천남로 123 (옥정동, 중앙타워)', '양주시청 도시경관과')">
+          <span class="font-bold text-blue-700 dark:text-sky-400 block">[기본] 경기도 양주시 회천남로 123</span>
+          <span class="text-[10px] text-slate-500">관할: 양주시청 도시경관과 (5㎡ 미만 신고 대상)</span>
+        </div>
+
+        <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 cursor-pointer hover:bg-blue-50 transition-colors" onclick="selectAddressOption('서울특별시 서초구 반포대로 14길 28 (서초동)', '서초구청 도시경관과')">
+          <span class="font-bold text-slate-900 dark:text-white block">서울특별시 서초구 반포대로 14길 28</span>
+          <span class="text-[10px] text-slate-500">관할: 서초구청 도시디자인과 (특정구역 가이드라인 적용)</span>
+        </div>
+
+        <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 cursor-pointer hover:bg-blue-50 transition-colors" onclick="selectAddressOption('서울특별시 강남구 테헤란로 152 (강남파이낸스)', '강남구청 도시계획과')">
+          <span class="font-bold text-slate-900 dark:text-white block">서울특별시 강남구 테헤란로 152</span>
+          <span class="text-[10px] text-slate-500">관할: 강남구청 옥외광고물팀 (안전도검사 기준 적용)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: CAD 200% 정밀 확대 뷰어 모달 -->
+  <div id="modal-zoom" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
+    <div class="w-full max-w-[420px] bg-slate-900 border border-cyan-500/50 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+      <div class="px-4 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+          <span class="text-xs font-bold text-white font-mono">CAD 200% 정밀 규격 도안 검사기</span>
+        </div>
+        <button onclick="closeModal('modal-zoom')" class="w-6 h-6 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center">✕</button>
+      </div>
+      <div class="cad-blueprint-grid p-6 text-white flex flex-col items-center justify-center overflow-auto max-h-[70vh]">
+        <div class="scale-125 transform transition-transform my-6">
+          <div class="w-64 border-b border-dashed border-cyan-400/80 mb-2 flex justify-between text-[11px] font-mono text-cyan-300">
+            <span>◀</span>
+            <span>W: 4,200 mm</span>
+            <span>▶</span>
+          </div>
+          <div class="w-64 h-20 bg-slate-950 border-2 border-cyan-400 rounded-lg flex items-center justify-center gap-2.5 relative shadow-[0_0_25px_rgba(0,200,255,0.4)]">
+            <div id="zoom-coffee-bulb" class="coffee-sign-on flex items-center justify-center">
+              <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6.5 2c.4.8.4 1.7 0 2.5" />
+                <path d="M10.5 1.5c.4 1 .4 2 0 3" />
+                <path d="M14.5 2c.4.8.4 1.7 0 2.5" />
+                <path d="M3 8.5h12v4a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5v-4z" fill="currentColor" fill-opacity="0.35" />
+                <path d="M15 9.5h1.5a2.5 2.5 0 0 1 0 5H15" />
+                <line x1="2" y1="20.5" x2="16" y2="20.5" stroke-width="2" />
+              </svg>
+            </div>
+            <span class="signage-glow-on text-white font-black text-lg" id="zoom-brand-text">모 두 의 카 페</span>
+            <div class="absolute -left-6 text-[9px] font-mono text-cyan-300">▲ 800 ▼</div>
+            <div class="absolute -right-6 text-[9px] font-mono text-cyan-300">D:90</div>
+          </div>
+        </div>
+        <div class="w-full text-left text-[10px] font-mono text-slate-400 border-t border-slate-800 pt-3 space-y-1">
+          <div>• 갈바 두께: 1.2T 레이저 가공 절곡 및 내열성 프라이머 도포</div>
+          <div>• 방수 등급: IP68 완전 방수형 LED 모듈 (12V 정전압)</div>
+          <div>• 지자체 풍압 안전계수: 1.45 (강풍 45m/s 안전성 통과)</div>
+        </div>
+      </div>
+      <div class="p-3 bg-slate-950 border-t border-slate-800 flex justify-end">
+        <button onclick="closeModal('modal-zoom')" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold">확인 닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 6: 파사드 원본 사진 뷰어 모달 -->
+  <div id="modal-photo" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md hidden flex-col items-center justify-center p-4">
+    <div class="w-full max-w-md bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col">
+      <div class="p-3 bg-slate-950 flex justify-between items-center text-white text-xs font-bold">
+        <span>매장 파사드 현장 실물 원본</span>
+        <button onclick="closeModal('modal-photo')" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <div class="p-2 bg-black flex items-center justify-center">
+        <img src="https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1200&q=85" alt="파사드 원본" class="w-full h-auto rounded-xl object-contain max-h-[70vh]" />
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 7: 인허가 필증 모달 (양주시장 명의 공식 증명서) -->
+  <div id="modal-license" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white rounded-3xl overflow-hidden shadow-2xl border-4 border-emerald-600 p-6 space-y-4 text-slate-900 text-xs">
+      <div class="text-center border-b-2 border-slate-800 pb-3">
+        <span class="text-[10px] text-slate-500 font-mono block">제 2026-양주시-옥외광고-0842 호</span>
+        <h2 class="text-base font-black tracking-widest mt-1">옥외광고물 표시 신고필증</h2>
+      </div>
+
+      <div class="space-y-2">
+        <div class="flex justify-between border-b border-slate-200 py-1">
+          <span class="text-slate-500">상호 (업소명):</span>
+          <span class="font-bold">모두의카페 (옥정중앙타워점)</span>
+        </div>
+        <div class="flex justify-between border-b border-slate-200 py-1">
+          <span class="text-slate-500">신청인 (광고주):</span>
+          <span class="font-bold">윤수병 (김대표)</span>
+        </div>
+        <div class="flex justify-between border-b border-slate-200 py-1">
+          <span class="text-slate-500">설치 장소:</span>
+          <span class="font-bold">경기도 양주시 회천남로 123, 2층</span>
+        </div>
+        <div class="flex justify-between border-b border-slate-200 py-1">
+          <span class="text-slate-500">광고물 종류 및 규격:</span>
+          <span class="font-bold">벽면이용간판 (4.2m × 0.8m, 3.36㎡)</span>
+        </div>
+        <div class="flex justify-between border-b border-slate-200 py-1">
+          <span class="text-slate-500">시공업소:</span>
+          <span class="font-bold">빛샘애드(옥외광고물 제작 시공 전문 / 등록 제2021-03호)</span>
+        </div>
+      </div>
+
+      <div class="text-center pt-3">
+        <p class="text-[10px] text-slate-600">「옥외광고물 등의 관리와 옥외광고산업 진흥에 관한 법률」 제3조 및 동법 시행령 제7조에 따라 신고를 필하였음을 증명합니다.</p>
+        <div class="mt-4 flex items-center justify-center gap-2">
+          <span class="text-sm font-black tracking-widest">양 주 시 장</span>
+          <span class="w-8 h-8 rounded-full border-2 border-red-600 text-red-600 flex items-center justify-center text-[10px] font-bold">인</span>
+        </div>
+      </div>
+
+      <button onclick="closeModal('modal-license')" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs mt-2">
+        확인 완료
+      </button>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-4 py-2.5 rounded-full text-xs font-medium shadow-2xl border border-slate-700 transition-all duration-300 opacity-0 pointer-events-none flex items-center gap-2 max-w-[360px]">
+    <i data-lucide="info" class="w-4 h-4 text-amber-400 shrink-0"></i>
+    <span id="toast-text">알림 메시지</span>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT APPLICATION LOGIC -->
+  <!-- ========================================================================= -->
+  <script>
+    // Global Application State
+    const state = {
+      theme: 'light',
+      mainView: 'kakao', // 'kakao' | 'app' | 'dual'
+      currentTab: 'intake', // 'intake' | 'permit' | 'cad' | 'business'
+      cadSubTab: 1,
+      isLightOn: true,
+      brandName: '모두의카페',
+      category: '카페/음료',
+      floorName: '2층 전면',
+      signType: 'LED 채널간판',
+      signPriceMin: 140,
+      signPriceMax: 175,
+      floorEquipCost: 15,
+      docIndex: 0,
+      jurisdiction: '경기도 양주시청 도시경관과',
+      address: '경기도 양주시 회천남로 123 (옥정동, 중앙타워)',
+    };
+
+    // Main View Switcher: Kakao vs App vs Dual
+    function switchMainView(view) {
+      state.mainView = view;
+      const paneKakao = document.getElementById('pane-kakao');
+      const paneApp = document.getElementById('pane-app');
+      const btnKakao = document.getElementById('btn-view-kakao');
+      const btnApp = document.getElementById('btn-view-app');
+      const btnDual = document.getElementById('btn-view-dual');
+      const container = document.getElementById('workspace-container');
+
+      // Reset buttons
+      btnKakao.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition-all flex items-center gap-1.5';
+      btnApp.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition-all flex items-center gap-1.5';
+      if (btnDual) btnDual.className = 'hidden md:flex px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-sky-300 transition-all items-center gap-1.5 border-l border-slate-700 ml-1';
+
+      if (view === 'kakao') {
+        paneKakao.classList.remove('hidden');
+        paneApp.classList.add('hidden');
+        btnKakao.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-[#fee500] text-slate-950 shadow-sm';
+        showToast('💬 윤수병 고객님 카카오톡 채팅창 화면으로 전환되었습니다.');
+      } else if (view === 'app') {
+        paneKakao.classList.add('hidden');
+        paneApp.classList.remove('hidden');
+        btnApp.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-blue-600 text-white shadow-sm';
+        showToast('⚡ SignPass 솔루션 앱으로 전환되었습니다.');
+      } else if (view === 'dual') {
+        paneKakao.classList.remove('hidden');
+        paneApp.classList.remove('hidden');
+        if (btnDual) btnDual.className = 'hidden md:flex px-3 py-1.5 rounded-lg text-xs font-bold text-sky-400 bg-slate-700/80 transition-all items-center gap-1.5 border-l border-slate-700 ml-1';
+        showToast('🖥️ 카톡 & 앱 듀얼 연동 뷰가 활성화되었습니다.');
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function toggleDualView() {
+      if (state.mainView === 'dual') {
+        switchMainView('app');
+      } else {
+        switchMainView('dual');
+      }
+    }
+
+    // =========================================================================
+    // CORE ACTION 1: 카카오톡 알림톡 카드 -> [원클릭 인허가 서류 생성] 버튼 클릭!
+    // =========================================================================
+    function triggerKakaoToPermit() {
+      showToast(`⚡ [${state.brandName}] 카카오톡 접수 데이터 연동 승인! SignPass 인허가 모듈로 이동합니다...`);
+
+      setTimeout(() => {
+        // Switch to App view and activate Permit Tab
+        if (state.mainView !== 'dual') {
+          switchMainView('app');
+        }
+        switchTab('permit');
+
+        // Flash highlight effect on permit card
+        const banner = document.getElementById('permit-linked-banner');
+        banner.classList.add('ring-4', 'ring-amber-400');
+        setTimeout(() => banner.classList.remove('ring-4', 'ring-amber-400'), 2000);
+
+        showToast(`🎉 카톡 상담 카드 연동 완료! 구청 제출용 서류 4종이 자동 생성되었습니다.`);
+      }, 500);
+    }
+
+    // =========================================================================
+    // CORE ACTION 2: SignPass 앱 -> [간판 상담 카드 발송하기] 클릭 시 카톡으로 전송
+    // =========================================================================
+    function sendConsultCardToKakao() {
+      syncAllComponents();
+
+      showToast(`📱 [${state.brandName}] 상담 카드가 윤수병 고객님 카카오톡으로 실시간 전송되었습니다!`);
+
+      // Add speech bubble in kakao
+      setTimeout(() => {
+        addKakaoBubble(`[간판 상담 접수 안내]\n고객님께서 요청하신 "${state.brandName}" 간판 상담 카드가 접수되었습니다.\n예상 시공비: 약 155~190만원\n원클릭으로 구청 인허가 서류를 자동 생성하실 수 있습니다.`, false);
+        
+        if (state.mainView !== 'dual') {
+          switchMainView('kakao');
+        }
+      }, 700);
+    }
+
+    function submitDirectQuote() {
+      showToast(`[${state.brandName}] 실시간 견적으로 즉시 접수되었습니다. 카톡 알림톡이 생성됩니다.`);
+      setTimeout(() => {
+        sendConsultCardToKakao();
+      }, 400);
+    }
+
+    // App Tab Switcher
+    function switchTab(tabId) {
+      state.currentTab = tabId;
+
+      document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
+
+      document.querySelectorAll('.nav-item').forEach(btn => {
+        btn.classList.remove('text-blue-700', 'dark:text-sky-400');
+        btn.classList.add('text-slate-400');
+        const icon = btn.querySelector('svg');
+        if (icon) icon.setAttribute('stroke-width', '1.8');
+        const span = btn.querySelector('span');
+        if (span) span.className = 'text-[10px] font-medium mt-1';
+      });
+
+      const targetPane = document.getElementById(`tab-content-${tabId}`);
+      if (targetPane) targetPane.classList.remove('hidden');
+
+      const activeBtn = document.getElementById(`nav-btn-${tabId}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('text-slate-400');
+        activeBtn.classList.add('text-blue-700', 'dark:text-sky-400');
+        const icon = activeBtn.querySelector('svg');
+        if (icon) icon.setAttribute('stroke-width', '2.2');
+        const span = activeBtn.querySelector('span');
+        if (span) span.className = 'text-[10px] font-bold mt-1 text-blue-700 dark:text-sky-400';
+      }
+    }
+
+    // Sync brand name across Kakao card, App, CAD blueprint, and Documents
+    function syncBrandName(val) {
+      state.brandName = val.trim() || '상호명 미입력';
+      syncAllComponents();
+    }
+
+    function syncAllComponents() {
+      // Kakao Card
+      const kakaoBrand = document.getElementById('kakao-disp-brand');
+      if (kakaoBrand) kakaoBrand.textContent = state.brandName;
+      const kakaoCat = document.getElementById('kakao-disp-cat');
+      if (kakaoCat) kakaoCat.textContent = state.category;
+      const kakaoFloor = document.getElementById('kakao-disp-floor');
+      if (kakaoFloor) kakaoFloor.textContent = state.floorName;
+      const kakaoType = document.getElementById('kakao-disp-type');
+      if (kakaoType) kakaoType.textContent = state.signType;
+
+      // Permit Tab
+      const permitBrand = document.getElementById('permit-input-brand');
+      if (permitBrand) permitBrand.value = state.brandName;
+      const permitHeader = document.getElementById('permit-status-header');
+      if (permitHeader) permitHeader.textContent = `신규 카톡 연동 접수 건 [${state.brandName} · ${state.floorName}]`;
+
+      // CAD Blueprint & 3D
+      const signageText = document.getElementById('signage-text');
+      if (signageText) signageText.textContent = state.brandName;
+      const facadeText = document.getElementById('facade-overlay-text');
+      if (facadeText) facadeText.textContent = state.brandName;
+      const zoomBrandText = document.getElementById('zoom-brand-text');
+      if (zoomBrandText) zoomBrandText.textContent = state.brandName;
+
+      // Call Modal
+      const callBrand = document.getElementById('call-modal-brand');
+      if (callBrand) callBrand.textContent = state.brandName;
+    }
+
+    // Category Selection
+    function selectCategory(btn, cat) {
+      document.querySelectorAll('.chip-cat').forEach(el => {
+        el.className = 'chip-cat py-2 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium text-xs flex items-center justify-between transition-all';
+        const icon = el.querySelector('svg');
+        if (icon) icon.classList.add('opacity-0');
+      });
+      btn.className = 'chip-cat active-chip py-2 px-2.5 rounded-xl border border-blue-600 dark:border-sky-500 bg-blue-50 dark:bg-sky-950/40 text-blue-700 dark:text-sky-300 font-bold text-xs flex items-center justify-between transition-all';
+      const icon = btn.querySelector('svg');
+      if (icon) icon.classList.remove('opacity-0');
+
+      state.category = cat;
+      syncAllComponents();
+    }
+
+    // Floor Selection
+    function selectFloor(btn, floorNum) {
+      document.querySelectorAll('.floor-chip').forEach(el => {
+        el.className = 'floor-chip py-2 px-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium text-xs text-center transition-all';
+      });
+      btn.className = 'floor-chip py-2 px-2 rounded-xl border border-blue-600 dark:border-sky-500 bg-blue-50 dark:bg-sky-950/40 text-blue-700 dark:text-sky-300 font-bold text-xs text-center transition-all';
+
+      if (floorNum === 1) {
+        state.floorName = '1층 전면';
+        state.floorEquipCost = 0;
+      } else if (floorNum === 2) {
+        state.floorName = '2층 전면';
+        state.floorEquipCost = 15;
+      } else {
+        state.floorName = '3층+ (스카이)';
+        state.floorEquipCost = 45;
+      }
+      syncAllComponents();
+      recalculatePrice();
+    }
+
+    // Sign Type Selection
+    function selectSignType(btn, name, minP, maxP) {
+      document.querySelectorAll('.sign-chip').forEach(el => {
+        el.className = 'sign-chip py-2 px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium text-xs flex items-center justify-between transition-all';
+        const icon = el.querySelector('svg');
+        if (icon) icon.classList.add('opacity-0');
+      });
+      btn.className = 'sign-chip py-2 px-2.5 rounded-xl border border-blue-600 dark:border-sky-500 bg-blue-50 dark:bg-sky-950/40 text-blue-700 dark:text-sky-300 font-bold text-xs flex items-center justify-between transition-all';
+      const icon = btn.querySelector('svg');
+      if (icon) icon.classList.remove('opacity-0');
+
+      state.signType = name;
+      state.signPriceMin = minP;
+      state.signPriceMax = maxP;
+      syncAllComponents();
+      recalculatePrice();
+    }
+
+    function recalculatePrice() {
+      const minTotal = state.signPriceMin + state.floorEquipCost;
+      const maxTotal = state.signPriceMax + state.floorEquipCost;
+      document.getElementById('calc-total-price').textContent = `약 ${minTotal} ~ ${maxTotal} 만원`;
+    }
+
+    // Permit calculation
+    function calculatePermit() {
+      const w = parseFloat(document.getElementById('permit-w-input').value) || 0;
+      const h = parseFloat(document.getElementById('permit-h-input').value) || 0;
+      const area = (w * h).toFixed(2);
+
+      document.getElementById('permit-calc-area').textContent = `${area} ㎡`;
+      document.getElementById('permit-calc-desc').textContent = `${w}m × ${h}m 기준`;
+
+      const statusEl = document.getElementById('permit-calc-status');
+      const inspectEl = document.getElementById('permit-calc-inspect');
+
+      if (area < 5.0) {
+        statusEl.textContent = '표시 신고 대상';
+        inspectEl.textContent = '안전도검사 비대상 (기준 통과)';
+        inspectEl.className = 'text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold';
+      } else {
+        statusEl.textContent = '표시 허가 대상 (5㎡ 이상)';
+        inspectEl.textContent = '안전도검사 대상 (구조계산서 첨부)';
+        inspectEl.className = 'text-[9px] text-amber-600 dark:text-amber-400 font-semibold';
+      }
+    }
+
+    // CAD Sub-tab switcher
+    function switchCadSubTab(idx) {
+      state.cadSubTab = idx;
+      [1, 2, 3].forEach(i => {
+        const btn = document.getElementById(`cad-subtab-${i}`);
+        const pane = document.getElementById(`cad-pane-${i}`);
+        if (i === idx) {
+          btn.className = 'flex-1 py-1.5 px-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-900 text-blue-700 dark:text-sky-400 shadow-xs border border-blue-100/50 dark:border-slate-800 flex items-center justify-center gap-1 transition-all';
+          pane.classList.remove('hidden');
+        } else {
+          btn.className = 'flex-1 py-1.5 px-2 text-xs font-medium rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-700 flex items-center justify-center gap-1 transition-all';
+          pane.classList.add('hidden');
+        }
+      });
+    }
+
+    // Toggle CAD LED Light
+    function toggleCadLight() {
+      state.isLightOn = !state.isLightOn;
+      const bulb = document.getElementById('led-bulb');
+      const zoomBulb = document.getElementById('zoom-coffee-bulb');
+      const text = document.getElementById('signage-text');
+      const btnText = document.getElementById('light-btn-text');
+
+      if (state.isLightOn) {
+        if (bulb) bulb.className = 'coffee-sign-on flex items-center justify-center transition-all duration-300';
+        if (zoomBulb) zoomBulb.className = 'coffee-sign-on flex items-center justify-center transition-all duration-300';
+        if (text) text.className = 'signage-glow-on text-white font-extrabold text-base tracking-wider';
+        btnText.textContent = '조명 소등(끄기)';
+        showToast('💡 간판 야간 LED 조명 및 커피잔 로고가 점등되었습니다.');
+      } else {
+        if (bulb) bulb.className = 'coffee-sign-off flex items-center justify-center transition-all duration-300';
+        if (zoomBulb) zoomBulb.className = 'coffee-sign-off flex items-center justify-center transition-all duration-300';
+        if (text) text.className = 'signage-glow-off font-extrabold text-base tracking-wider';
+        btnText.textContent = '조명 점등(켜기)';
+        showToast('간판 조명이 소등되었습니다.');
+      }
+    }
+
+    // Kakao Chat simulation
+    function sendKakaoChatMessage() {
+      const input = document.getElementById('kakao-chat-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      addKakaoBubble(msg, true);
+      input.value = '';
+
+      // AI Response Simulator
+      setTimeout(() => {
+        const replies = [
+          `안녕하세요, 윤수병 고객님! "${state.brandName}" 간판 상담 접수 건 확인했습니다. 구청 인허가 서류가 자동 준비되어 있습니다.`,
+          `네, 고객님! 현장 실측 및 인허가 신고 서류 4종을 [원클릭 인허가 서류 생성] 버튼으로 즉시 내려받으실 수 있습니다.`,
+          `빛샘애드 시공팀에서 담당자가 배정되었습니다. 통화 상담이 필요하시면 [고객에게 바로 전화하기]로 연결됩니다.`
+        ];
+        const randomReply = replies[Math.floor(Math.random() * replies.length)];
+        addKakaoBubble(randomReply, false);
+      }, 900);
+    }
+
+    function addKakaoBubble(text, isMe) {
+      const container = document.getElementById('extra-chat-messages');
+      const wrapper = document.createElement('div');
+      const timeStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+      if (isMe) {
+        wrapper.className = 'flex justify-end items-end gap-1.5 animate-in fade-in duration-200';
+        wrapper.innerHTML = `
+          <span class="text-[9px] text-slate-500">${timeStr}</span>
+          <div class="bg-[#fee500] text-[#191919] p-2.5 rounded-2xl rounded-tr-xs text-xs font-medium max-w-[260px] shadow-xs leading-relaxed whitespace-pre-line">
+            ${escapeHtml(text)}
+          </div>
+        `;
+      } else {
+        wrapper.className = 'flex items-start gap-2 max-w-[320px] animate-in fade-in duration-200';
+        wrapper.innerHTML = `
+          <div class="w-8 h-8 rounded-[12px] bg-slate-950 p-1 flex-shrink-0 border border-slate-700 flex items-center justify-center">
+            <img src="./assets/logo.png" alt="SIGN PASS" class="w-full h-full object-contain" />
+          </div>
+          <div>
+            <span class="text-[11px] font-bold text-slate-900 block mb-0.5">SIGN PASS ✓</span>
+            <div class="flex items-end gap-1.5">
+              <div class="bg-white text-slate-900 p-2.5 rounded-2xl rounded-tl-xs text-xs font-medium shadow-xs border border-slate-200/80 leading-relaxed whitespace-pre-line">
+                ${escapeHtml(text)}
+              </div>
+              <span class="text-[9px] text-slate-500">${timeStr}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      container.appendChild(wrapper);
+      const scrollArea = document.getElementById('kakao-chat-scroll');
+      scrollArea.scrollTop = scrollArea.scrollHeight;
+    }
+
+    function escapeHtml(string) {
+      const div = document.createElement('div');
+      div.innerText = string;
+      return div.innerHTML;
+    }
+
+    // Modal Handlers
+    function openModal(modalId) {
+      const el = document.getElementById(modalId);
+      if (el) {
+        el.classList.remove('hidden');
+        el.classList.add('flex');
+      }
+    }
+    function closeModal(modalId) {
+      const el = document.getElementById(modalId);
+      if (el) {
+        el.classList.add('hidden');
+        el.classList.remove('flex');
+      }
+    }
+
+    function openCallClientModal() { openModal('modal-call'); }
+    function openAddressSearchModal() { openModal('modal-address'); }
+    function openZoomModal() { openModal('modal-zoom'); }
+    function openPhotoPreviewModal() { openModal('modal-photo'); }
+    function openGov24Modal() { openModal('modal-gov'); }
+    function openLicenseModal() { openModal('modal-license'); }
+    function openStampModal() { showToast('빛샘애드 사업자 직인이 등록되어 전자문서에 자동 날인됩니다.'); }
+    function openCertModal() { showToast('공동인증서(정부24 및 세움터)가 정상 유효 상태입니다.'); }
+    function openChatDrawer() { showToast('채팅방 설정 및 참여자 관리 메뉴'); }
+
+    function saveCallMemo() {
+      const memo = document.getElementById('call-memo').value;
+      closeModal('modal-call');
+      showToast('상담 메모가 저장되었습니다.');
+    }
+
+    function selectAddressOption(addr, jurisdiction) {
+      state.address = addr;
+      state.jurisdiction = jurisdiction;
+      document.getElementById('permit-input-addr').value = addr;
+      document.getElementById('permit-disp-jurisdiction').textContent = `${jurisdiction} (조례 자동적용)`;
+      closeModal('modal-address');
+      showToast(`설치 주소가 변경되었습니다: ${addr}`);
+    }
+
+    function completeGovReception() {
+      closeModal('modal-gov');
+      showToast('🎉 정부24 전자민원창구에 정식 접수되었습니다! 카톡 알림 발송 완료');
+      addKakaoBubble(`[정부24 세움터 접수 완료 통보]\n- 접수번호: 제2026-양주-0842호\n- 담당부서: 양주시청 도시경관과\n- 심의 예상 일정: 영업일 기준 3일 소요\nSignPass에서 필증 발급까지 원클릭으로 처리됩니다.`, false);
+    }
+
+    // Legal Document Package 4-Tabs Modal
+    function openPdfModal(idx = 0) {
+      openModal('modal-pdf');
+      switchDocTab(idx);
+    }
+
+    function switchDocTab(idx) {
+      state.docIndex = idx;
+      [0, 1, 2, 3].forEach(i => {
+        const btn = document.getElementById(`doc-tab-${i}`);
+        if (btn) {
+          if (i === idx) {
+            btn.className = 'px-3 py-1.5 rounded-t-xl font-bold bg-white dark:bg-slate-900 text-blue-700 dark:text-sky-400 border-t border-x border-slate-200 dark:border-slate-800';
+          } else {
+            btn.className = 'px-3 py-1.5 rounded-t-xl font-medium text-slate-500 hover:text-slate-800';
+          }
+        }
+      });
+
+      const container = document.getElementById('doc-content-container');
+      if (idx === 0) {
+        // 별지 제1호 서식 신청서
+        container.innerHTML = `
+          <div class="bg-white p-4 rounded-xl shadow-xs border border-slate-300 text-slate-900 space-y-3 font-sans">
+            <div class="text-center border-b pb-2">
+              <span class="text-[9px] text-slate-400">[별지 제1호서식] (행정안전부령 제1호)</span>
+              <h3 class="text-sm font-black mt-1">옥외광고물등 표시 [✓]신고서 [ ]허가신청서</h3>
+            </div>
+            <table class="w-full text-[10px] border-collapse border border-slate-300">
+              <tr>
+                <td class="border border-slate-300 p-1.5 bg-slate-100 font-bold w-20">신청인(광고주)</td>
+                <td class="border border-slate-300 p-1.5 font-bold">윤수병 (010-5595-8137)</td>
+              </tr>
+              <tr>
+                <td class="border border-slate-300 p-1.5 bg-slate-100 font-bold">상호 (업소명)</td>
+                <td class="border border-slate-300 p-1.5 font-bold text-blue-800">${state.brandName} (${state.category})</td>
+              </tr>
+              <tr>
+                <td class="border border-slate-300 p-1.5 bg-slate-100 font-bold">설치 장소</td>
+                <td class="border border-slate-300 p-1.5">${state.address}</td>
+              </tr>
+              <tr>
+                <td class="border border-slate-300 p-1.5 bg-slate-100 font-bold">광고물 규격</td>
+                <td class="border border-slate-300 p-1.5 font-mono">가로 4.2m × 세로 0.8m (면적: 3.36㎡)</td>
+              </tr>
+              <tr>
+                <td class="border border-slate-300 p-1.5 bg-slate-100 font-bold">시공업체</td>
+                <td class="border border-slate-300 p-1.5 font-bold">빛샘애드(옥외광고물 제작 시공 전문 / 127-43-78358)</td>
+              </tr>
+            </table>
+            <div class="pt-2 text-right text-[10px]">
+              <span class="font-bold">양 주 시 장 귀하</span>
+              <span class="ml-2 inline-block px-1.5 py-0.5 rounded border border-red-600 text-red-600 font-bold text-[9px]">전자직인날인</span>
+            </div>
+          </div>
+        `;
+      } else if (idx === 1) {
+        // 원색도안 및 시방서
+        container.innerHTML = `
+          <div class="bg-white p-4 rounded-xl shadow-xs border border-slate-300 text-slate-900 space-y-3 font-sans">
+            <div class="text-center border-b pb-2">
+              <h3 class="text-sm font-black">옥외광고물 원색도안 및 제작구조시방서</h3>
+              <span class="text-[10px] text-slate-500">도면 축척: SCALE 1:50 · 전면 LED 채널</span>
+            </div>
+            <div class="bg-slate-950 p-4 rounded-lg text-center flex flex-col items-center justify-center">
+              <span class="text-cyan-300 font-mono text-[9px] mb-1">◀ W: 4,200 mm ▶</span>
+              <div class="w-48 py-2 bg-slate-900 border border-cyan-400 rounded text-amber-300 font-black text-xs tracking-wider shadow-[0_0_12px_#fee500]">
+                ${state.brandName}
+              </div>
+              <span class="text-cyan-300 font-mono text-[9px] mt-1">▲ H: 800 mm ▼</span>
+            </div>
+            <div class="text-[10px] space-y-1 text-slate-700">
+              <div>• 프레임: 갈바 EGI 1.2T 방청 프라이머 마감</div>
+              <div>• 광원: 3구 LED 모듈 5700K 12V (IP68 방수)</div>
+              <div>• 고정: SUS 304 셋트앙카 M10 × 4개소 (벽체 정착)</div>
+            </div>
+          </div>
+        `;
+      } else if (idx === 2) {
+        // 설치장소 원색사진 및 입면배치도
+        container.innerHTML = `
+          <div class="bg-white p-4 rounded-xl shadow-xs border border-slate-300 text-slate-900 space-y-2.5 font-sans">
+            <div class="text-center border-b pb-2">
+              <h3 class="text-sm font-black">설치장소 현장 원색사진 및 입면 배치도</h3>
+              <span class="text-[10px] text-slate-500">${state.address}</span>
+            </div>
+            <div class="relative w-full h-44 rounded-lg overflow-hidden border border-slate-300">
+              <img src="https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=600&q=80" alt="현장사진" class="w-full h-full object-cover" />
+              <div class="absolute top-[30%] left-1/2 -translate-x-1/2 bg-amber-400/90 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded shadow">
+                ${state.brandName} 간판 설치 위치 (${state.floorName})
+              </div>
+            </div>
+            <p class="text-[10px] text-slate-600">지면으로부터 설치 높이: 3.4m (조례상 보행자 통행 안전기준 2.5m 초과 충족)</p>
+          </div>
+        `;
+      } else {
+        // 건물(점포) 사용승낙서
+        container.innerHTML = `
+          <div class="bg-white p-4 rounded-xl shadow-xs border border-slate-300 text-slate-900 space-y-3 font-sans">
+            <div class="text-center border-b pb-2">
+              <h3 class="text-sm font-black">건물(점포) 옥외광고물 설치 사용승낙서</h3>
+            </div>
+            <p class="text-[10px] leading-relaxed text-slate-700">
+              본 건물 소유주(관리단)는 임차인 <strong>${state.brandName} (대표자: 윤수병)</strong>이(가) 상기 표시 장소에 법정 규격에 적합한 옥외광고물(LED 채널간판)을 설치 및 관리하는 것에 대하여 정히 승낙합니다.
+            </p>
+            <div class="p-2.5 bg-slate-100 rounded-lg text-[10px] space-y-1">
+              <div>• 승낙건물: ${state.address}</div>
+              <div>• 설치위치: ${state.floorName}</div>
+              <div>• 사용승낙 기간: 2026.09.15 ~ 임대차 만료일까지</div>
+            </div>
+            <div class="text-right text-[10px] pt-2">
+              <span>건물 소유자 (임대인): 중앙타워관리단 (인)</span>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function downloadPdfSimulate() {
+      showToast(`📦 [${state.brandName}] 구청 제출용 4종 공인 서식 압축 패키지(.ZIP) 다운로드 완료!`);
+      closeModal('modal-pdf');
+    }
+
+    function downloadCadPackage() {
+      showToast(`📐 DWG 캐드 원본 및 고해상도 PDF 도면 패키지가 다운로드되었습니다.`);
+    }
+
+    function togglePhotoUpload() {
+      showToast('매장 전면 파사드 사진이 새로 갱신되었습니다.');
+    }
+
+    function resetDemoData() {
+      state.brandName = '모두의카페';
+      document.getElementById('input-brand-name').value = '모두의카페';
+      syncAllComponents();
+      showToast('초기 데모 데이터로 복구되었습니다.');
+    }
+
+    // Dark Mode Toggle
+    function toggleDarkMode() {
+      const html = document.documentElement;
+      const themeIcon = document.getElementById('theme-icon');
+      if (html.classList.contains('dark')) {
+        html.classList.remove('dark');
+        state.theme = 'light';
+        if (themeIcon) themeIcon.textContent = '🌙';
+      } else {
+        html.classList.add('dark');
+        state.theme = 'dark';
+        if (themeIcon) themeIcon.textContent = '☀️';
+      }
+    }
+
+    // Toast Alert Function
+    let toastTimer = null;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastText = document.getElementById('toast-text');
+      if (!toast || !toastText) return;
+      toastText.textContent = msg;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      toast.classList.add('opacity-100');
+
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2800);
+    }
+
+    // Init Lucide
+    document.addEventListener("DOMContentLoaded", function() {
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+      }
+      syncAllComponents();
+    });
+  </script>
+</body>
+</html>

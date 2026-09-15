@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+
+<html lang="ko"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>SignPass - 도면·입면도 및 시방서 (모바일)</title>
+<!-- Tailwind CSS v3 with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#0066ff',
+              600: '#0052cc',
+              700: '#003d99',
+              900: '#00205b',
+            },
+            cad: {
+              bg: '#04101e',
+              grid: '#0a233d',
+              accent: '#00e5ff',
+            }
+          },
+          fontFamily: {
+            sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<!-- Lucide Icons -->
+<script src="https://unpkg.com/lucide@latest"></script>
+<!-- Custom Styles for Mobile Experience & Blueprint Grid -->
+<style data-purpose="custom-layout">
+    body {
+      background-color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+    /* Blueprint CAD Grid Background */
+    .cad-blueprint-grid {
+      background-color: #051325;
+      background-image: 
+        linear-gradient(rgba(0, 150, 255, 0.12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 150, 255, 0.12) 1px, transparent 1px),
+        linear-gradient(rgba(0, 150, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 150, 255, 0.04) 1px, transparent 1px);
+      background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
+      background-position: -1px -1px, -1px -1px, -1px -1px, -1px -1px;
+    }
+    /* Signage glowing light text */
+    .signage-glow {
+      text-shadow: 0 0 14px rgba(255, 255, 255, 0.8), 0 0 28px rgba(255, 220, 100, 0.6);
+    }
+    /* Safe Bottom Inset for iOS Home Indicator */
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom, 20px);
+    }
+  </style>
+</head>
+<body class="flex justify-center min-h-screen text-slate-800">
+<!-- Mobile Viewport Container (iOS standard max 430px) -->
+<div class="w-full max-w-[430px] bg-slate-100 min-h-screen flex flex-col shadow-2xl relative pb-28">
+<!-- BEGIN: Top Navigation Header -->
+<header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 py-3 flex items-center justify-between shadow-[0_1px_3px_rgba(0,0,0,0.03)]" data-purpose="app-header">
+<div class="flex items-center gap-2 cursor-pointer select-none">
+<div class="relative w-11 h-11 shrink-0 flex items-center justify-center">
+<img alt="SignPass 3D Logo" class="w-full h-full object-contain filter drop-shadow-[0_4px_10px_rgba(0,180,255,0.35)]" src="../assets/logo.png"/>
+</div>
+<div class="flex items-baseline leading-none">
+<span class="font-extrabold text-[21px] tracking-tight text-slate-900">Sign</span>
+<span class="italic font-black text-[23px] tracking-tighter bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-400 bg-clip-text text-transparent transform -skew-x-6 inline-block ml-0.5 filter drop-shadow-[0_1px_4px_rgba(6,182,212,0.3)]">PASS</span>
+</div>
+</div>
+<!-- Right: Day/Night Toggle & User Avatar -->
+<div class="flex items-center gap-2.5">
+<!-- Sun/Moon Dark Mode Toggle -->
+<button aria-label="Toggle dark mode" class="w-13 h-7 px-1.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 flex items-center gap-1.5 shadow-inner" type="button">
+<span class="text-xs">☀️</span>
+<span class="text-xs text-blue-300">🌙</span>
+</button>
+<!-- Profile Button -->
+<button aria-label="User Profile" class="w-8 h-8 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-sm shadow-sm hover:opacity-90" type="button">
+<i class="w-4 h-4 text-white" data-lucide="user"></i>
+</button>
+</div>
+</header>
+<!-- END: Top Navigation Header -->
+<!-- BEGIN: Main Content Area -->
+<main class="flex-1 px-4 py-4 space-y-4">
+<!-- BEGIN: Sub-tabs / Mode Switcher -->
+<nav class="bg-blue-50/70 p-1 rounded-2xl border border-blue-100 flex items-center shadow-sm" data-purpose="sub-tab-switcher">
+<button class="flex-1 py-2 px-2 text-xs font-bold rounded-xl bg-white text-blue-700 shadow-sm border border-blue-100/50 flex items-center justify-center gap-1.5 transition-all">
+<i class="w-3.5 h-3.5 text-blue-600" data-lucide="pen-tool"></i>
+<span>CAD 원색도안</span>
+</button>
+<button class="flex-1 py-2 px-2 text-xs font-medium rounded-xl text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1.5 transition-all">
+<i class="w-3.5 h-3.5 text-slate-400" data-lucide="box"></i>
+<span>3D 입면 합성</span>
+</button>
+<button class="flex-1 py-2 px-2 text-xs font-medium rounded-xl text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1.5 transition-all">
+<i class="w-3.5 h-3.5 text-slate-400" data-lucide="file-text"></i>
+<span>자재·시방서</span>
+</button>
+</nav>
+<!-- END: Sub-tabs / Mode Switcher -->
+<!-- BEGIN: Store Info Card -->
+<section class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm flex items-center justify-between" data-purpose="store-info-card">
+<div class="flex items-start gap-3">
+<div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 mt-0.5 border border-blue-100">
+<i class="w-5 h-5" data-lucide="store"></i>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h2 class="font-bold text-slate-900 text-sm tracking-tight">모두의카페 (서초본점)</h2>
+<span class="text-[10px] font-extrabold bg-amber-300 text-amber-950 px-1.5 py-0.5 rounded shadow-xs">1층 전면</span>
+</div>
+<p class="text-[11px] text-slate-500 mt-1 font-medium leading-relaxed">
+              서울 서초구 반포대로 14길 · W 4,200mm × H 800mm
+            </p>
+</div>
+</div>
+<button aria-label="Refresh Data" class="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 active:rotate-180 transition-transform" type="button">
+<i class="w-3.5 h-3.5" data-lucide="rotate-cw"></i>
+</button>
+</section>
+<!-- END: Store Info Card -->
+<!-- BEGIN: CAD Elevation Blueprint Section -->
+<section class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm space-y-3" data-purpose="cad-blueprint-viewer">
+<!-- Blueprint Title & Badges -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-blue-600"></span>
+<h3 class="text-xs font-bold text-slate-900 tracking-tight">구청 심의용 LED 채널 원색도안</h3>
+</div>
+<span class="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+            SCALE 1:50
+          </span>
+</div>
+<!-- Interactive Blueprint Display Box -->
+<div class="cad-blueprint-grid rounded-xl border border-slate-800 p-3 text-white overflow-hidden relative shadow-inner">
+<!-- Top Technical Meta Info -->
+<div class="flex justify-between items-center text-[9px] text-slate-400 font-mono pb-2 border-b border-slate-800/80">
+<div class="flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span>
+<span class="text-teal-300 font-semibold">DWG: SP-2026-CAD-0915</span>
+</div>
+<span class="text-slate-400">지자체 심의 표준 규격</span>
+</div>
+<!-- Signage Drawing Canvas Mockup -->
+<div class="py-7 px-1 flex flex-col items-center justify-center relative">
+<!-- Top Width Dimension Indicator -->
+<div class="w-full max-w-[260px] flex flex-col items-center mb-2">
+<div class="flex items-center justify-between w-full text-[10px] font-mono text-cyan-300 font-semibold px-1">
+<span>◀</span>
+<span>W: 4,200 mm <span class="text-[8px] text-cyan-400/80 font-normal">(±15mm)</span></span>
+<span>▶</span>
+</div>
+<div class="w-full border-b border-dashed border-cyan-500/50 mt-0.5"></div>
+</div>
+<!-- Sign Letter Rendering Body -->
+<div class="relative w-full max-w-[270px] bg-slate-950/85 border-2 border-cyan-400/40 rounded-lg py-3 px-4 shadow-[0_0_20px_rgba(0,180,255,0.18)] flex items-center justify-center my-1">
+<!-- Left Height Indicator -->
+<div class="absolute -left-6 top-1/2 -translate-y-1/2 flex flex-col items-center text-[8px] font-mono text-cyan-300 leading-tight">
+<span>▲</span>
+<span class="py-0.5">800</span>
+<span>▼</span>
+</div>
+<!-- Channel Signage Artwork -->
+<div class="flex items-center gap-2">
+<span class="w-3.5 h-3.5 rounded-full bg-amber-400 shadow-[0_0_12px_#f59e0b] ring-2 ring-amber-300/40"></span>
+<span class="signage-glow text-white font-extrabold text-base tracking-wider">모 두 의 카 페</span>
+</div>
+<!-- Right Depth Indicator -->
+<div class="absolute -right-6 top-1/2 -translate-y-1/2 text-[8px] font-mono text-cyan-300 flex flex-col items-center leading-tight">
+<span>D</span>
+<span>90</span>
+<span>mm</span>
+</div>
+</div>
+<!-- Material Tag under Sign -->
+<div class="mt-2.5 px-2 py-0.5 rounded bg-slate-900/90 border border-slate-700 text-[8px] text-slate-300 font-mono tracking-tight text-center">
+              전면 발광 백색 에폭시 PC판 + 알루미늄 1.2T 갈바 프레임
+            </div>
+</div>
+<!-- Bottom Spec Annotation Footnotes -->
+<div class="pt-2 border-t border-slate-800/80 flex justify-between items-center text-[8px] text-slate-400 font-mono">
+<span class="truncate">광원: 삼성 3구 LED 모듈 5700K (12V)</span>
+<span class="flex items-center gap-1 text-emerald-400 font-semibold flex-shrink-0">
+<span class="w-1 h-1 rounded-full bg-emerald-400"></span>
+              풍압 45m/s 안전성 통과
+            </span>
+</div>
+</div>
+<!-- Blueprint Quick Controls -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<button class="py-2.5 px-3 bg-blue-50/70 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="text-amber-500">💡</span>
+<span>조명 점등 켜기/끄기</span>
+</button>
+<button class="py-2.5 px-3 bg-blue-50/70 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors" type="button">
+<i class="w-3.5 h-3.5 text-blue-600" data-lucide="zoom-in"></i>
+<span>도면 200% 정밀 확대</span>
+</button>
+</div>
+</section>
+<!-- END: CAD Elevation Blueprint Section -->
+<!-- BEGIN: Detailed Specs & Regulatory Compliance Section -->
+<section class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm space-y-3" data-purpose="specs-and-compliance">
+<!-- Header & Law Standard Pill -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<i class="w-4 h-4 text-blue-600" data-lucide="calculator"></i>
+<h3 class="text-xs font-bold text-slate-900 tracking-tight">상세 치수 및 허가 적합성 연산</h3>
+</div>
+<span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+<i class="w-2.5 h-2.5" data-lucide="check-circle"></i>
+            지자체 기준 100% 충족
+          </span>
+</div>
+<!-- Spec Metric Triple Grid -->
+<div class="grid grid-cols-3 gap-2">
+<!-- Metric 1 -->
+<div class="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 flex flex-col justify-between">
+<span class="text-[10px] text-slate-500 font-medium">가로 × 세로</span>
+<div class="my-1">
+<span class="text-xs font-black text-slate-900">4.2m × 0.8m</span>
+</div>
+<span class="text-[9px] text-slate-500">벽면 가로형</span>
+</div>
+<!-- Metric 2 -->
+<div class="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 flex flex-col justify-between">
+<span class="text-[10px] text-slate-500 font-medium">표시 면적</span>
+<div class="my-1">
+<span class="text-sm font-black text-blue-600">3.36 ㎡</span>
+</div>
+<span class="text-[9px] text-emerald-600 font-semibold">5㎡ 미만 신고</span>
+</div>
+<!-- Metric 3 -->
+<div class="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 flex flex-col justify-between">
+<span class="text-[10px] text-slate-500 font-medium">설치 층수 / 높이</span>
+<div class="my-1">
+<span class="text-xs font-black text-slate-900">1층 (H: 3.4m)</span>
+</div>
+<span class="text-[9px] text-slate-500">사다리 시공</span>
+</div>
+</div>
+<!-- Legal Compliance Callout Notice -->
+<div class="bg-blue-50/60 border border-blue-100 rounded-xl p-3 flex items-start gap-2.5">
+<i class="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" data-lucide="shield-check"></i>
+<p class="text-[11px] text-slate-700 leading-relaxed">
+<strong class="text-blue-900 font-bold">서초구 옥외광고물 조례 검토 완료:</strong> 업소당 벽면이용간판 1개 한도 내 적합하며, 지면으로부터 3층 이하 및 폭 80% 이하 점유 기준을 완벽하게 만족합니다.
+          </p>
+</div>
+</section>
+<!-- END: Detailed Specs & Regulatory Compliance Section -->
+<!-- BEGIN: CTA Action Buttons -->
+<section class="space-y-2.5 pt-1" data-purpose="action-buttons-container">
+<!-- Primary Blue Button: Download CAD / Blueprint Package -->
+<button class="w-full py-3.5 px-4 bg-blue-900 hover:bg-blue-950 text-white rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition-all" type="button">
+<i class="w-4 h-4" data-lucide="download"></i>
+<span>도면 패키지 (DWG / PDF / 고해상도 JPG) 다운로드</span>
+</button>
+<!-- Secondary High-Contrast Yellow Button: E-Submit Application -->
+<button class="w-full py-3.5 px-4 bg-amber-400 hover:bg-amber-500 text-slate-950 rounded-2xl font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm active:scale-[0.99] transition-all" type="button">
+<i class="w-3.5 h-3.5 fill-current" data-lucide="play"></i>
+<span>구청 인허가 심의용 전자제출 원클릭 전송</span>
+</button>
+<!-- Small Disclaimer -->
+<p class="text-[10px] text-center text-slate-400 leading-tight pt-1">
+          SignPass의 모든 도면 및 계산 데이터는 옥외광고물 등의 관리와 옥외광고산업 진흥에 관한 법률 표준 규격을 준수합니다.
+        </p>
+</section>
+<!-- END: CTA Action Buttons -->
+</main>
+<!-- END: Main Content Area -->
+<!-- BEGIN: Bottom Tab Navigation Bar -->
+<nav class="fixed bottom-0 max-w-[430px] w-full bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 pt-2 pb-safe flex justify-around items-center z-40" data-purpose="bottom-navigation">
+<!-- Tab 1: 간판접수 -->
+<a class="flex flex-col items-center py-1 px-3 text-slate-400 hover:text-slate-600 transition-colors" href="#">
+<i class="w-5 h-5 stroke-[1.8]" data-lucide="message-square"></i>
+<span class="text-[10px] font-medium mt-1">간판접수</span>
+</a>
+<!-- Tab 2: 인허가현황 -->
+<a class="flex flex-col items-center py-1 px-3 text-slate-400 hover:text-slate-600 transition-colors" href="#">
+<i class="w-5 h-5 stroke-[1.8]" data-lucide="shield-check"></i>
+<span class="text-[10px] font-medium mt-1">인허가현황</span>
+</a>
+<!-- Tab 3: 도면·입면도 (Active) -->
+<a class="flex flex-col items-center py-1 px-3 text-blue-700 transition-colors" href="#">
+<i class="w-5 h-5 stroke-[2.2]" data-lucide="compass"></i>
+<span class="text-[10px] font-bold mt-1 text-blue-700">도면·입면도</span>
+</a>
+<!-- Tab 4: 사업자관리 -->
+<a class="flex flex-col items-center py-1 px-3 text-slate-400 hover:text-slate-600 transition-colors" href="#">
+<i class="w-5 h-5 stroke-[1.8]" data-lucide="store"></i>
+<span class="text-[10px] font-medium mt-1">사업자관리</span>
+</a>
+</nav>
+<!-- END: Bottom Tab Navigation Bar -->
+</div>
+<!-- Lucide Icons Initialization Script -->
+<script data-purpose="icon-initialization">
+    document.addEventListener("DOMContentLoaded", function() {
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+      }
+    });
+  </script>
+</body></html>
