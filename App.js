@@ -24,11 +24,11 @@ if (Platform.OS !== 'web') {
   }
 }
 
-const DEFAULT_LOCAL_URL = 'http://192.168.0.102:8080/index.html';
+const DEFAULT_PRODUCTION_URL = 'https://mochiz2027.github.io/signpass/';
 
 export default function App() {
-  const [currentUrl, setCurrentUrl] = useState(DEFAULT_LOCAL_URL);
-  const [inputUrl, setInputUrl] = useState(DEFAULT_LOCAL_URL);
+  const [currentUrl, setCurrentUrl] = useState(DEFAULT_PRODUCTION_URL);
+  const [inputUrl, setInputUrl] = useState(DEFAULT_PRODUCTION_URL);
   const [isLoading, setIsLoading] = useState(true);
   const [canGoBack, setCanGoBack] = useState(false);
   const [showConfig, setShowConfig] = useState(false);

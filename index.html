@@ -979,7 +979,7 @@
               <span class="px-1.5 py-0.2 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[9px] font-bold">인증 파트너</span>
             </div>
             <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-              사업자: 127-43-78358 경기 양주/ 서울 경기 북부 총괄
+              사업자: 127-43-78358 · 경기 양주/경기 북부
             </p>
           </div>
         </section>
@@ -1008,28 +1008,44 @@
           </div>
 
           <div class="space-y-1.5 text-xs">
+            <!-- 1. 모두의식당(의정부본점) -->
             <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <div>
                 <div class="flex items-center gap-1.5">
-                  <span class="font-bold text-slate-900 dark:text-white">모두의카페 (옥정중앙)</span>
+                  <span class="font-bold text-slate-900 dark:text-white">모두의식당(의정부본점)</span>
+                  <span class="text-[9px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 px-1.5 py-0.2 rounded font-bold">심의 대기</span>
+                </div>
+                <span class="text-[10px] text-slate-400 block mt-0.5">의정부시 녹양로18번길 · 심의 접수</span>
+              </div>
+              <button onclick="switchTab('permit')" class="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] rounded-lg">
+                서류검토
+              </button>
+            </div>
+
+            <!-- 2. 모두의카페(옥정중앙타워) -->
+            <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-slate-900 dark:text-white">모두의카페(옥정중앙타워)</span>
                   <span class="text-[9px] bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-1.5 py-0.2 rounded font-bold">카톡 연동</span>
                 </div>
-                <span class="text-[10px] text-slate-400 block mt-0.5">양주시 회천남로 · 4.2m 채널</span>
+                <span class="text-[10px] text-slate-400 block mt-0.5">옥정중앙타워 · 4.2m 채널간판</span>
               </div>
-              <button onclick="switchTab('permit')" class="px-2 py-1 bg-blue-600 text-white font-bold text-[10px] rounded-lg">
+              <button onclick="switchTab('permit')" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] rounded-lg">
                 서류보기
               </button>
             </div>
 
+            <!-- 3. 모두의헤어(의정부점) -->
             <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <div>
                 <div class="flex items-center gap-1.5">
-                  <span class="font-bold text-slate-900 dark:text-white">스타일헤어 (강남역)</span>
+                  <span class="font-bold text-slate-900 dark:text-white">모두의헤어(의정부점)</span>
                   <span class="text-[9px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-1.5 py-0.2 rounded font-bold">허가 완료</span>
                 </div>
-                <span class="text-[10px] text-slate-400 block mt-0.5">강남구 테헤란로 · 필증 교부</span>
+                <span class="text-[10px] text-slate-400 block mt-0.5">의정부시 의정부1동 31-2 · 필증 교부</span>
               </div>
-              <button onclick="openLicenseModal()" class="px-2 py-1 bg-emerald-600 text-white font-bold text-[10px] rounded-lg">
+              <button onclick="openLicenseModal()" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg">
                 필증출력
               </button>
             </div>
